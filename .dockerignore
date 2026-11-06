@@ -1,0 +1,14 @@
+**/.git
+**/.vs
+**/.idea
+**/bin
+**/obj
+**/TestResults
+**/*.md
+.spec/
+tasks/
+pgdata/
+meshcentral-data/
+meshcentral-files/
+caddy-data/
+caddy-config/

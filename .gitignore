@@ -1,0 +1,37 @@
+## .NET and Build Outputs
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+TestResults/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.dll
+*.pdb
+
+## Visual Studio & JetBrains & VSCode
+.vs/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+## Docker and runtime local data
+pgdata/
+meshcentral-data/
+meshcentral-files/
+caddy-data/
+caddy-config/
+data/
+
+## Environment and Secrets
+*.env
+*.env.*
+!*.env.example
+secrets/
+*.pfx
+*.key
+*.pem

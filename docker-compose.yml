@@ -1,0 +1,98 @@
+services:
+  db:
+    image: postgres:17
+    container_name: gtv_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gtviewer
+      POSTGRES_USER: gtviewer
+      POSTGRES_PASSWORD: gtviewer_dev_pwd
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gtviewer -d gtviewer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gtv_internal
+
+  meshcentral:
+    image: ghcr.io/ylianst/meshcentral:1.3.1
+    container_name: gtv_meshcentral
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DYNAMIC_CONFIG: "false"
+    volumes:
+      - ./config/meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json:ro
+      - meshcentral_data:/opt/meshcentral/meshcentral-data
+      - meshcentral_files:/opt/meshcentral/meshcentral-files
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4430', (res) => process.exit(res.statusCode ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - gtv_internal
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gtviewer-web:latest
+    container_name: gtv_web
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=gtviewer;Username=gtviewer;Password=gtviewer_dev_pwd
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - gtv_internal
+
+  caddy:
+    image: caddy:2.9-alpine
+    container_name: gtv_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      meshcentral:
+        condition: service_started
+    networks:
+      - gtv_internal
+
+networks:
+  gtv_internal:
+    name: gtv_internal
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+
+volumes:
+  pgdata:
+  meshcentral_data:
+  meshcentral_files:
+  caddy_data:
+  caddy_config:

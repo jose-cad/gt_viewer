@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json",
+  "settings": {
+    "cert": "mesh.localhost",
+    "port": 4430,
+    "aliasPort": 443,
+    "redirPort": 8081,
+    "tlsOffload": true,
+    "trustedProxy": "caddy",
+    "SelfUpdate": false,
+    "AllowFraming": true,
+    "WebRTC": false,
+    "agentDownloads": {
+      "enabled": false
+    },
+    "allowLoginToken": true,
+    "certUrl": "https://caddy"
+  },
+  "domains": {
+    "": {
+      "title": "gt_viewer MeshCentral",
+      "minify": true,
+      "NewAccounts": false,
+      "allowedFramingOrigins": [
+        "https://gtviewer.localhost",
+        "https://gtviewer.local",
+        "https://localhost",
+        "http://localhost",
+        "http://127.0.0.1"
+      ],
+      "userConsentFlags": 120,
+      "consentTimeout": 60,
+      "autoAcceptOnTimeout": false,
+      "consentMessages": {
+        "desktop": "{0} da TI quer acessar sua tela. Permitir?",
+        "terminal": "{0} da TI quer abrir um terminal remoto. Permitir?",
+        "files": "{0} da TI quer acessar arquivos. Permitir?"
+      }
+    }
+  }
+}

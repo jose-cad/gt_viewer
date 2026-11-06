@@ -1,0 +1,36 @@
+Na fase de brainstorm (entrevista inicial) eu preciso discordar logo de cara: clonar o Intune inteiro não é viável para uma equipe pequena. É um produto feito por centenas de engenheiros, e uma parte dele depende de acordos que só Microsoft, Apple e Google têm. O que é viável é um sistema de gerenciamento remoto focado no que a empresa usa de fato. Antes de escrever código, vale descartar uma opção mais simples: ferramentas de código aberto que já fazem boa parte disso (Fleet, MeshCentral, Tactical RMM, Headwind MDM).
+
+Viabilidade dos 17 itens
+
+- Viável, com um programa nosso instalado nos computadores (Windows, Linux e macOS):
+  - Gerenciamento e inventário (1)
+  - Configuração remota (2)
+  - Instalação de apps (3)
+  - Segurança: BitLocker, Defender, firewall e senha de administrador local (5)
+  - Conformidade (6)
+  - Atualizações do Windows (8)
+  - Ações remotas (9)
+  - Scripts e correções (11)
+  - Relatórios (12)
+  - Suporte remoto no estilo TeamViewer (13)
+  - Permissões e auditoria da equipe de TI (14)
+- Viável com ressalvas:
+  - Android: viável pela Android Management API do Google, que é gratuita.
+  - iPhone, iPad e Mac em nível de gerenciamento completo: exigem certificado da Apple e Apple Business Manager, ou seja, burocracia e uma conta corporativa na Apple.
+  - Computadores novos (10): sem o Autopilot, mas dá para fazer com imagem ou script de preparação.
+  - Certificados (15): com uma autoridade certificadora própria.
+  - Controle de acesso (7): só se a empresa usar um provedor de login central (Entra, Google Workspace) onde dê para encaixar a regra.
+  - IA (17): com um modelo de IA próprio, não o Copilot.
+- Inviável ou não compensa:
+  - Proteção de dados dentro de apps (4): só funciona porque Outlook e Teams trazem embutido o código da Microsoft.
+  - Firmware remoto e dispositivos especializados (16): dependem de acordo com o fabricante.
+  - Elevação de privilégios (16): até dá, mas fazer do zero tem risco alto de segurança.
+
+Perguntas para o gestor
+
+1. Por que não usar o próprio Intune? O motivo é custo? A empresa já usa Microsoft 365, Entra ou Google Workspace? O plano Microsoft 365 Business Premium já inclui o Intune, então vale comparar esse custo com o de construir e manter um sistema próprio.
+2. Quantos equipamentos são, e de quais tipos (Windows, Mac, Linux, Android, iPhone)? Os celulares são da empresa ou dos próprios funcionários?
+3. Se a primeira versão pudesse ter só 3 a 5 itens da lista, quais seriam? Minha sugestão: inventário, suporte remoto, ações remotas e scripts, instalação de apps e relatório de conformidade, começando só por Windows.
+4. Quem vai desenvolver e manter, qual o prazo esperado, e onde o sistema vai rodar (servidor interno ou nuvem)?
+
+Com as respostas, escrevo o primeiro resumo do projeto (.spec/gt-viewer/brief.md) e mando para a revisão dos subagentes.

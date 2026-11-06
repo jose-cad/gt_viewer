@@ -1,0 +1,27 @@
+{
+	admin off
+}
+
+# HTTP endpoints for local development & verification
+http://localhost, http://127.0.0.1, http://gtviewer.localhost {
+	header Referrer-Policy "no-referrer"
+	reverse_proxy web:8080
+}
+
+http://mesh.localhost {
+	header Referrer-Policy "no-referrer"
+	reverse_proxy meshcentral:4430
+}
+
+# HTTPS endpoints with internal TLS for development
+https://localhost, https://gtviewer.localhost {
+	tls internal
+	header Referrer-Policy "no-referrer"
+	reverse_proxy web:8080
+}
+
+https://mesh.localhost {
+	tls internal
+	header Referrer-Policy "no-referrer"
+	reverse_proxy meshcentral:4430
+}

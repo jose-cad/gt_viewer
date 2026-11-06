@@ -1,0 +1,11 @@
+Aqui estão as 7 perguntas, prontas para enviar ao gestor:
+
+1. Sistema principal: o que é o sistema principal da empresa? Em que linguagem ele foi feito e ele já tem API? Que ações nele devem disparar algo no gerenciador de notebooks? Por exemplo: funcionário desligado leva ao bloqueio automático do notebook dele.
+2. Controle dos alugados: além de inventário, suporte remoto, bloqueio e instalação de programas, o que mais seria esse "controle maior" sobre os notebooks alugados? Por exemplo: conferir o número de série com o contrato da locadora. PODE ACRESCENTAR ISSO TAMBEM ALEM DO QUE JA FOI LISTADO
+3. Contrato de aluguel: o contrato com a locadora proíbe instalar programas ou alterar configurações nos notebooks? NAO 
+4. Quantidade: dos ~700 computadores, quantos são notebooks? São todos Windows? TENHO A MAIORIA SAO NOTBOOKS ALGUMAS CPUs E ALGUMAS MAQUINAS LINUX. 
+5. Permissão do funcionário: quando a TI acessar a tela de um notebook remotamente, o sistema deve pedir permissão ao funcionário a cada acesso?  É recomendado por causa da LGPD, já que a tela pode mostrar conversas e dados pessoais. OK
+6. Técnicos: quantos técnicos vão usar o sistema? Todos podem fazer tudo, ou alguns só podem consultar, outros podem bloquear etc.? SERIA LEGAL TER UM CONTROLE DE ACESSO PARA O SISTEMA, COM PERMISSAO. 
+7. Onde fica o servidor: o servidor precisa ser acessível pela internet, porque os notebooks estão no Brasil todo. Há duas opções: (a) uma máquina virtual na própria empresa, o que exige IP fixo e uma porta liberada no firewall; (b) um servidor alugado na nuvem (VPS), por algumas dezenas de reais por mês. Qual vocês preferem? SERVIDOR PROPRIO, SERVIDOR FISICO
+
+Sobre as ferramentas, fica decidido o MeshCentral como base: código aberto, usado há anos, com login de duas etapas e API para integrar. Antes de fecharmos, faço um teste para confirmar que ele cobre tudo da primeira versão. Se faltar algo, eu escolho o complemento e te aviso.
