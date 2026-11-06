@@ -1,11 +1,19 @@
+using GtViewer.Web.Data;
 using GtViewer.Web.Models;
 using GtViewer.Web.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+
+builder.Services.AddDbContext<GtViewerDbContext>(options =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    options.UseNpgsql(connectionString);
+});
 
 builder.Services.Configure<MeshCentralOptions>(
     builder.Configuration.GetSection(MeshCentralOptions.SectionName));
