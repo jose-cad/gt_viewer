@@ -4,11 +4,11 @@ using Xunit;
 
 namespace GtViewer.Tests;
 
-public class HomePageTests : IClassFixture<WebApplicationFactory<Program>>
+public class HomePageTests : IClassFixture<WebApplicationFactory<GtViewer.Web.Program>>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly WebApplicationFactory<GtViewer.Web.Program> _factory;
 
-    public HomePageTests(WebApplicationFactory<Program> factory)
+    public HomePageTests(WebApplicationFactory<GtViewer.Web.Program> factory)
     {
         _factory = factory;
     }

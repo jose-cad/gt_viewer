@@ -1,9 +1,15 @@
+using GtViewer.Web.Models;
+using GtViewer.Web.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+
+builder.Services.Configure<MeshCentralOptions>(
+    builder.Configuration.GetSection(MeshCentralOptions.SectionName));
+builder.Services.AddSingleton<MeshLoginTokenService>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -33,4 +39,7 @@ app.MapRazorPages()
 
 app.Run();
 
-public partial class Program { }
+namespace GtViewer.Web
+{
+    public partial class Program { }
+}
