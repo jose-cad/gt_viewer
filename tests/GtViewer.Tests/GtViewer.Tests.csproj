@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GtViewer.Web\GtViewer.Web.csproj" />
+    <ProjectReference Include="..\..\tools\GtViewer.Poc\GtViewer.Poc.csproj" />
   </ItemGroup>
 
 </Project>
