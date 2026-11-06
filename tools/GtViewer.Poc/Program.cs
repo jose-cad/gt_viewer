@@ -12,6 +12,7 @@ var pass = Environment.GetEnvironmentVariable("MESHCENTRAL_PASS") ?? "admin_dev_
 
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "all";
 var targetNodeId = args.Length > 1 ? args[1] : null;
+var extraArg = args.Length > 2 ? args[2] : null;
 
 await using var client = new MeshCentralPocClient(new Uri(url), user, pass);
 
@@ -37,6 +38,60 @@ try
             tcs.TrySetResult();
         };
         await tcs.Task;
+        return;
+    }
+
+    // Scripts de Tarefa 3 (Bloqueio / Resgate)
+    if (command is "rescue" or "lock" or "unlock" or "checklock")
+    {
+        if (string.IsNullOrEmpty(targetNodeId))
+        {
+            Console.WriteLine($"[PoC] Erro: NodeId obrigatorio para o comando '{command}'.");
+            Console.WriteLine("Uso: dotnet run --project tools/GtViewer.Poc <rescue|lock|unlock|checklock> <nodeId> [argumento_extra]");
+            return;
+        }
+
+        var scriptsBaseDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../scripts/agent/windows"));
+        if (!Directory.Exists(scriptsBaseDir))
+        {
+            scriptsBaseDir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "scripts/agent/windows"));
+        }
+
+        string scriptName = command switch
+        {
+            "rescue" => "GarantirContaResgate.ps1",
+            "lock" => "BloquearMaquina.ps1",
+            "unlock" => "DesbloquearMaquina.ps1",
+            "checklock" => "VerificarBloqueio.ps1",
+            _ => throw new InvalidOperationException()
+        };
+
+        var scriptPath = Path.Combine(scriptsBaseDir, scriptName);
+        if (!File.Exists(scriptPath))
+        {
+            Console.WriteLine($"[PoC] Erro: Script nao encontrado em {scriptPath}");
+            return;
+        }
+
+        var scriptContent = await File.ReadAllTextAsync(scriptPath);
+
+        // Parametrização se necessária
+        if (command == "rescue" && !string.IsNullOrEmpty(extraArg))
+        {
+            scriptContent = $"$Password = '{extraArg.Replace("'", "''")}';\n" + scriptContent;
+        }
+        else if (command == "lock" && !string.IsNullOrEmpty(extraArg))
+        {
+            scriptContent = $"$ContactMessage = '{extraArg.Replace("'", "''")}';\n" + scriptContent;
+        }
+
+        Console.WriteLine($"[PoC] Enviando script '{scriptName}' para node {targetNodeId} via SYSTEM...");
+        var cmdResult = await client.RunFixedScriptAsync(targetNodeId, scriptContent, TimeSpan.FromSeconds(20));
+
+        Console.WriteLine($"\n[PoC] Resultado da Execução:");
+        Console.WriteLine($"  -> GTV-RESULT: {cmdResult.GtvResult}");
+        Console.WriteLine($"  -> GTV-EXIT:   {cmdResult.ExitCode}");
+        Console.WriteLine($"  -> Saída Bruta:\n{cmdResult.RawOutput}");
         return;
     }
 

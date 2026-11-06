@@ -108,3 +108,65 @@ Para executar a validação final da Tarefa 2 quando as VMs de teste (uma em gru
    Reinicie uma das VMs e confirme o recebimento do evento em tempo real no console.
 5. **Verificação de isolamento de tráfego:**
    Capture o tráfego com `tcpdump` no host ou Wireshark na VM para confirmar ausência de qualquer destino externo à WAN da empresa.
+
+---
+
+## 5. Teste de Conceito — Bloqueio e Conta de Resgate (Tarefa 3)
+
+Implementação dos scripts PowerShell de gerenciamento local e blindagem de segurança (`spec.md:234`, seção 2.5).
+
+### 5.1 Scripts Criados (`scripts/agent/windows/`)
+
+1. **`GarantirContaResgate.ps1`:**
+   - Cria/atualiza o usuário local `gtv-resgate`.
+   - Adiciona ao grupo Administradores por SID `S-1-5-32-544` (agnóstico ao idioma do SO).
+   - Configura `PasswordNeverExpires = $true`, `UserMayNotChangePassword = $true`, `Enabled = $true` e `Unlock-LocalUser`.
+   - Se invocado com `-Revealed`, encerra sessões ativas da conta `gtv-resgate`.
+   - Retorna: `GTV-RESULT=OK` e `GTV-EXIT=0`.
+
+2. **`BloquearMaquina.ps1`:**
+   - Pré-condição: aborta com `GTV-RESULT=FALHA_SEM_CONTA_RESGATE` se a conta `gtv-resgate` não existir ou estiver inválida.
+   - Backup idempotente: salva `original_sec.cfg` e chaves `LegalNotice` originais em `C:\ProgramData\gt_viewer\`; se o arquivo `lock.marker` já existir, **não sobrescreve o backup original**.
+   - Restrição local: aplica template `secedit` concedendo `SeInteractiveLogonRight` exclusivamente ao SID de `gtv-resgate` e negando a `Authenticated Users` (`S-1-5-11`) e `Users` (`S-1-5-32-545`).
+   - Mensagem de bloqueio: atualiza `LegalNoticeCaption` e `LegalNoticeText`.
+   - Persistência contra GPO / reinicialização: cria tarefas agendadas locais (`GtvReapplyLock` e `GtvReapplyLockStartup`) que executam a cada 5 minutos como `SYSTEM` reaplicando o bloqueio caso um `gpupdate /force` do domínio rode com a máquina ligada.
+   - Encerra todas as sessões interativas abertas (`logoff`).
+   - Retorna: `GTV-RESULT=BLOQUEADA` e `GTV-EXIT=0`.
+
+3. **`DesbloquearMaquina.ps1`:**
+   - Restaura as diretivas originais de `original_sec.cfg` via `secedit`.
+   - Restaura ou limpa as mensagens de login `LegalNotice`.
+   - Remove as tarefas agendadas locais de persistência.
+   - Remove o marcador `lock.marker` e arquivos temporários de bloqueio.
+   - Encerra qualquer sessão ativa da conta `gtv-resgate`.
+   - Retorna: `GTV-RESULT=DESBLOQUEADA` e `GTV-EXIT=0`.
+
+4. **`VerificarBloqueio.ps1`:**
+   - Verifica a existência de `lock.marker`. Se presente, reaplica a política de segurança, encerra sessões de `gtv-resgate` e retorna `GTV-RESULT=BLOQUEADA`.
+   - Se ausente, retorna `GTV-RESULT=DESBLOQUEADA`.
+
+### 5.2 Validação nas VMs Windows via Ferramenta PoC
+
+Com a VM online no MeshCentral:
+
+```bash
+# 1. Garantir conta de resgate com senha aleatória
+dotnet run --project tools/GtViewer.Poc rescue <nodeId> "SenhaForteResgate!2026"
+
+# 2. Bloquear a máquina
+dotnet run --project tools/GtViewer.Poc lock <nodeId> "Equipamento bloqueado pela TI. Contato: ti@empresa.com.br"
+
+# 3. Conferir na VM bloqueada:
+#    - Tentativa de login com usuário comum/domínio é recusada ("O tipo de logon não é permitido").
+#    - Login com gtv-resgate entra normalmente.
+#    - Executar `gpupdate /force` na VM e aguardar 5 min: a tarefa periódica mantém o bloqueio ativo.
+#    - Reiniciar a VM: continua bloqueada na tela de login com a mensagem visível e Wi-Fi/cabo funcionando.
+
+# 4. Desbloquear a máquina remotamente
+dotnet run --project tools/GtViewer.Poc unlock <nodeId>
+
+# 5. Conferir na VM desbloqueada:
+#    - Usuários do domínio/locais entram normalmente.
+#    - Mensagem de aviso desapareceu.
+```
+
