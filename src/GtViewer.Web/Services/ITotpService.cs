@@ -59,6 +59,13 @@ public class TotpService : ITotpService
         return qrCode.GetGraphic(5);
     }
 
+    public static string ComputeCurrentTotpCode(string plainSecret)
+    {
+        var key = Base32Decode(plainSecret);
+        var step = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
+        return ComputeTotp(key, step);
+    }
+
     public bool ValidateCode(int tecnicoId, string plainSecret, string code, out string? failureReason)
     {
         failureReason = null;

@@ -1,10 +1,13 @@
 using GtViewer.Web.Models;
+using GtViewer.Web.Security;
 using GtViewer.Web.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace GtViewer.Web.Pages;
 
+[Authorize(Policy = Permissoes.SuporteRemoto)]
 public class RemoteSupportModel : PageModel
 {
     private readonly MeshLoginTokenService _tokenService;
