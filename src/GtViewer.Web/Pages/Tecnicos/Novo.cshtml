@@ -1,0 +1,68 @@
+@page "/tecnicos/novo"
+@model GtViewer.Web.Pages.Tecnicos.NovoModel
+@{
+    ViewData["Title"] = "Novo Técnico";
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <h4 class="mb-0 fw-bold text-dark">Cadastrar Novo Técnico</h4>
+                    <small class="text-muted">O técnico será autenticado pelo Active Directory (LDAPS) e receberá um código de ativação para configurar o 2FA.</small>
+                </div>
+                <div class="card-body p-4">
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @Model.ErrorMessage
+                        </div>
+                    }
+
+                    <form method="post">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="UsuarioDominio" class="form-label fw-bold">Usuário do Domínio (AD) *</label>
+                                <input type="text" class="form-control" id="UsuarioDominio" name="UsuarioDominio" value="@Model.UsuarioDominio" placeholder="ex: carlos.almeida" required autofocus autocomplete="off" />
+                                <div class="form-text">Mesmo sAMAccountName ou login utilizado no Active Directory.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="NomeExibicao" class="form-label fw-bold">Nome de Exibição *</label>
+                                <input type="text" class="form-control" id="NomeExibicao" name="NomeExibicao" value="@Model.NomeExibicao" placeholder="ex: Carlos Almeida" required />
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="Email" class="form-label fw-bold">E-mail Corporativo</label>
+                            <input type="email" class="form-control" id="Email" name="Email" value="@Model.Email" placeholder="carlos.almeida@empresa.com" />
+                        </div>
+
+                        <h5 class="fw-bold text-dark mt-4 mb-3 border-bottom pb-2">Delegação de Permissões</h5>
+                        <p class="text-muted small">Selecione as ações que este técnico terá autorização para executar:</p>
+
+                        <div class="row g-3 mb-4">
+                            @foreach (var perm in Model.TodasPermissoes)
+                            {
+                                <div class="col-md-6">
+                                    <div class="form-check p-3 border rounded bg-light">
+                                        <input class="form-check-input" type="checkbox" name="PermissoesSelecionadas" value="@perm.Chave" id="perm_@perm.Chave" @(Model.PermissoesSelecionadas.Contains(perm.Chave) ? "checked" : "") />
+                                        <label class="form-check-label fw-bold" for="perm_@perm.Chave">
+                                            @perm.Nome
+                                        </label>
+                                        <div class="text-muted small">@perm.Descricao</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-page="/Tecnicos/Index" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary px-4">Salvar e Gerar Código de Ativação</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

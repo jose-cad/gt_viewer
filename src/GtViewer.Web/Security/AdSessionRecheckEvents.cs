@@ -31,23 +31,16 @@ public class AdSessionRecheckEvents : CookieAuthenticationEvents
         var lastRecheck = DateTimeOffset.FromUnixTimeSeconds(lastRecheckSec);
         var now = DateTimeOffset.UtcNow;
 
-        // Reconferência a cada 15 minutos (J1 passo 5 e Tarefa 6)
-        if (now - lastRecheck < TimeSpan.FromMinutes(15))
-        {
-            return;
-        }
-
         var dbContext = context.HttpContext.RequestServices.GetRequiredService<GtViewerDbContext>();
-        var ldapService = context.HttpContext.RequestServices.GetRequiredService<ILdapService>();
         var auditoriaService = context.HttpContext.RequestServices.GetRequiredService<IAuditoriaService>();
 
+        // Checagem imediata no banco local: técnico desativado perde a sessão imediatamente (J9 e Tarefa 7)
         var tecnico = await dbContext.Tecnicos.FirstOrDefaultAsync(t => t.UsuarioDominio.ToLower() == username.ToLower());
         if (tecnico == null || !tecnico.Ativo)
         {
-            // Técnico desativado no banco
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync();
-            await auditoriaService.RegistrarAsync(username, TiposAuditoria.EncerrarSessaoDesativacaoAd, "gt_viewer", false, "Técnico inativo no sistema");
+            await auditoriaService.RegistrarAsync(username, TiposAuditoria.CriarAlterarDesativarTecnico, "gt_viewer", false, "Sessão encerrada imediatamente devido à desativação do técnico");
             return;
         }
 
@@ -66,9 +59,16 @@ public class AdSessionRecheckEvents : CookieAuthenticationEvents
             }
 
             // Conta de emergência não passa pela reconferência no AD
-            UpdateLastRecheckClaim(context, now);
             return;
         }
+
+        // Reconferência periódica no AD a cada 15 minutos (J1 passo 5 e Tarefa 6)
+        if (now - lastRecheck < TimeSpan.FromMinutes(15))
+        {
+            return;
+        }
+
+        var ldapService = context.HttpContext.RequestServices.GetRequiredService<ILdapService>();
 
         // Usuário regular: reconferência no AD via LDAPS
         var adStatus = await ldapService.CheckUserStatusAsync(username);

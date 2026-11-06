@@ -1,0 +1,155 @@
+@page "/tecnicos"
+@model GtViewer.Web.Pages.Tecnicos.IndexModel
+@{
+    ViewData["Title"] = "Administração de Técnicos";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">Técnicos e Permissões</h2>
+            <p class="text-muted mb-0">Gerencie o acesso, credenciais e delegações dos técnicos do sistema.</p>
+        </div>
+        <div>
+            <a asp-page="/Tecnicos/Novo" class="btn btn-primary">
+                + Cadastrar Novo Técnico
+            </a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong>Sucesso:</strong> @Model.MensagemSucesso
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Atenção:</strong> @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.CodigoAtivacaoGerado))
+    {
+        <div class="card border-primary mb-4 bg-light">
+            <div class="card-body">
+                <h5 class="card-title text-primary fw-bold">Novo Código de Ativação Gerado</h5>
+                <p class="card-text mb-2">
+                    Entregue o código abaixo de forma segura ao técnico <strong>@Model.UsuarioCodigoGerado</strong>.
+                    Ele será necessário para o primeiro login e cadastro do autenticador 2FA (válido por 24 horas, máx 5 tentativas):
+                </p>
+                <div class="p-3 bg-white border rounded font-monospace fs-4 text-center text-dark user-select-all fw-bold">
+                    @Model.CodigoAtivacaoGerado
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Nome de Exibição</th>
+                        <th>E-mail</th>
+                        <th>Status</th>
+                        <th>2FA</th>
+                        <th>Permissões</th>
+                        <th>Último Acesso</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.Tecnicos)
+                    {
+                        <tr>
+                            <td>
+                                <span class="fw-bold font-monospace">@t.UsuarioDominio</span>
+                                @if (t.IsContaEmergencia)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Emergência</span>
+                                }
+                            </td>
+                            <td>@t.NomeExibicao</td>
+                            <td class="text-muted">@(t.Email ?? "-")</td>
+                            <td>
+                                @if (t.Ativo)
+                                {
+                                    <span class="badge bg-success">Ativo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inativo</span>
+                                }
+                            </td>
+                            <td>
+                                @if (t.TotpConfigurado)
+                                {
+                                    <span class="badge bg-info text-dark">Configurado</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Pendente</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1" style="max-width: 320px;">
+                                    @if (string.IsNullOrWhiteSpace(t.Permissoes))
+                                    {
+                                        <span class="text-muted small">Sem permissões extras</span>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var p in t.Permissoes.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                                        {
+                                            <span class="badge bg-light text-dark border">@p</span>
+                                        }
+                                    }
+                                </div>
+                            </td>
+                            <td class="text-muted small">
+                                @(t.UltimoLoginEm.HasValue ? t.UltimoLoginEm.Value.ToString("dd/MM/yyyy HH:mm") : "Nunca")
+                            </td>
+                            <td class="text-end">
+                                @if (!t.IsContaEmergencia)
+                                {
+                                    <div class="btn-group btn-group-sm">
+                                        <a asp-page="/Tecnicos/Editar" asp-route-id="@t.Id" class="btn btn-outline-secondary" title="Editar permissões">
+                                            Permissões
+                                        </a>
+
+                                        @if (t.Ativo)
+                                        {
+                                            <form method="post" asp-page-handler="Desativar" asp-route-id="@t.Id" class="d-inline" onsubmit="return confirm('Deseja realmente desativar este técnico? Suas sessões ativas serão encerradas imediatamente.');">
+                                                <button type="submit" class="btn btn-outline-danger">Desativar</button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <form method="post" asp-page-handler="Ativar" asp-route-id="@t.Id" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-success">Ativar</button>
+                                            </form>
+                                        }
+
+                                        <form method="post" asp-page-handler="Redefinir2Fa" asp-route-id="@t.Id" class="d-inline" onsubmit="return confirm('Redefinir a verificação 2FA gerará um novo código de ativação. Confirmar?');">
+                                            <button type="submit" class="btn btn-outline-warning text-dark" title="Redefinir 2FA">Redefinir 2FA</button>
+                                        </form>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Gerenciado via CLI</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

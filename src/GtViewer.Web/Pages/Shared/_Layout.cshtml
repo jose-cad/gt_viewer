@@ -23,12 +23,39 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/RemoteSupport">Suporte Remoto (J5)</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
-                        </li>
+                        @if (User.HasPermissao(Permissoes.SuporteRemoto))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/RemoteSupport">Suporte Remoto (J5)</a>
+                            </li>
+                        }
+                        @if (User.HasPermissao(Permissoes.AdministrarTecnicos))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Tecnicos/Index">Técnicos (J9)</a>
+                            </li>
+                        }
+                    </ul>
+                    <ul class="navbar-nav">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item d-flex align-items-center me-3">
+                                <span class="badge bg-light text-dark border me-2">@User.Identity.Name</span>
+                                @if (User.IsAdmin())
+                                {
+                                    <span class="badge bg-primary">Admin</span>
+                                }
+                            </li>
+                            <li class="nav-item">
+                                <a class="btn btn-outline-danger btn-sm" asp-page="/Logout">Sair</a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="btn btn-outline-primary btn-sm" asp-page="/Login">Entrar</a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>

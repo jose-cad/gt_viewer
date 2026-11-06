@@ -48,7 +48,17 @@ builder.Services.AddSingleton<ITotpService, TotpService>();
 builder.Services.AddSingleton<IActivationCodeService, ActivationCodeService>();
 builder.Services.AddSingleton<ILoginSecurityService, LoginSecurityService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 builder.Services.AddScoped<IServerCliService, ServerCliService>();
+
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permissao in Permissoes.Todas)
+    {
+        options.AddPolicy(permissao, policy =>
+            policy.RequireAssertion(ctx => ctx.User.HasPermissao(permissao)));
+    }
+});
 
 builder.Services.Configure<LdapOptions>(
     builder.Configuration.GetSection(LdapOptions.SectionName));
