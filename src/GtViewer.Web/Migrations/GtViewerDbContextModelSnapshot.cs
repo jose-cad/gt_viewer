@@ -617,6 +617,12 @@ namespace GtViewer.Web.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<DateTimeOffset?>("EmergenciaExpiraEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsContaEmergencia")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("NomeExibicao")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -626,6 +632,10 @@ namespace GtViewer.Web.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SenhaLocalHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<int>("TentativasFalhas")
                         .HasColumnType("integer");
