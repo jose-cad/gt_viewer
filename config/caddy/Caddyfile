@@ -5,23 +5,67 @@
 # HTTP endpoints for local development & verification
 http://localhost, http://127.0.0.1, http://gtviewer.localhost {
 	header Referrer-Policy "no-referrer"
-	reverse_proxy web:8080
+
+	@gtViewerForbidden {
+		not client_ip private_ranges
+		not path /agente/*
+	}
+	handle @gtViewerForbidden {
+		respond "Acesso restrito à rede interna" 403
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
 }
 
 http://mesh.localhost {
 	header Referrer-Policy "no-referrer"
-	reverse_proxy meshcentral:4430
+
+	@meshForbidden {
+		not client_ip private_ranges
+		not path /agent.ashx* /meshrelay.ashx*
+	}
+	handle @meshForbidden {
+		respond "Acesso restrito à rede interna" 403
+	}
+
+	handle {
+		reverse_proxy meshcentral:4430
+	}
 }
 
 # HTTPS endpoints with internal TLS for development
 https://localhost, https://gtviewer.localhost {
 	tls internal
 	header Referrer-Policy "no-referrer"
-	reverse_proxy web:8080
+
+	@gtViewerForbidden {
+		not client_ip private_ranges
+		not path /agente/*
+	}
+	handle @gtViewerForbidden {
+		respond "Acesso restrito à rede interna" 403
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
 }
 
 https://mesh.localhost {
 	tls internal
 	header Referrer-Policy "no-referrer"
-	reverse_proxy meshcentral:4430
+
+	@meshForbidden {
+		not client_ip private_ranges
+		not path /agent.ashx* /meshrelay.ashx*
+	}
+	handle @meshForbidden {
+		respond "Acesso restrito à rede interna" 403
+	}
+
+	handle {
+		reverse_proxy meshcentral:4430
+	}
 }

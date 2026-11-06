@@ -170,3 +170,101 @@ dotnet run --project tools/GtViewer.Poc unlock <nodeId>
 #    - Mensagem de aviso desapareceu.
 ```
 
+---
+
+## 6. Teste de Conceito — Tela Remota (Tarefa 4)
+
+Validação de arquitetura e implementação dos requisitos de suporte remoto (`spec.md:235`, seções 2.1 e 2.6).
+
+### 6.1 Código Exato de `viewmode` e Parâmetro `hide`
+
+Com base na inspeção de `default.handlebars` (linhas 20520-20560 e 2095-2140) no MeshCentral v1.3.1:
+
+| Parâmetro | Valor | Descrição e Comportamento |
+|---|---|---|
+| **`viewmode=11`** | `MainDevDesktop` | **Selecionado para o gt_viewer**. Abre diretamente o canvas interativo de controle remoto e aciona imediatamente `deskAdjust()` para dimensionamento responsivo da tela. |
+| **`viewmode=10`** | `MainDev` | Abre a aba geral do dispositivo (visão de abas: Geral, Console, Terminal, Arquivos), exigindo navegação manual até o desktop. |
+| **`hide=31`** | Soma dos bits 1 + 2 + 4 + 8 + 16 | Oculta toda a interface externa do MeshCentral dentro do iframe:<br>• Bit 1 (`1`): Barra superior (Top bar)<br>• Bit 2 (`2`): Barra de ferramentas (Tool bar)<br>• Bit 4 (`4`): Rodapé (Bottom bar)<br>• Bit 8 (`8`): Título da aba (Tab title)<br>• Bit 16 (`16`): Menu lateral de navegação (Left bar / MainMenu)<br>**Resultado:** Apenas o canvas da tela remota é renderizado no iframe. |
+
+### 6.2 Direitos Mínimos da Conta e do Usuário Espelho
+
+Com base na definição do MeshCentral v1.3.1 (`apprelays.js:38-61` e `meshuser.js:6070-6085`):
+
+```csharp
+public const long MESHRIGHT_REMOTECONTROL = 0x00000008; // 8 - Ver e controlar tela
+```
+
+- **Usuário Espelho do Técnico:**
+  - Identificador: `user//gtv_mirror_<username>` (sem senha, criado via `adduser` com `siteadmin: 0`).
+  - Bitmask concedido: **estritamente `8` (`MESHRIGHT_REMOTECONTROL`)**.
+  - Bits sensíveis zerados (`0`):
+    - `MESHRIGHT_AGENTCONSOLE = 16` (Terminal / Console): Bloqueado (`rights & 16 == 0`).
+    - `MESHRIGHT_SERVERFILES = 32` (Arquivos): Bloqueado (`rights & 32 == 0`).
+    - `MESHRIGHT_REMOTECOMMAND = 131072` (Comandos arbitrários): Bloqueado (`rights & 131072 == 0`).
+    - `MESHRIGHT_MANAGEUSERS = 2` e `MESHRIGHT_MANAGECOMPUTERS = 4`: Bloqueados.
+  - Regra nativa do MeshCentral: O método `adddeviceuser` (`meshuser.js:6075`) recusa qualquer atribuição com `rights & 7 != 0` em nível de dispositivo, validando que permissões estruturais pertencem apenas a grupos, e links de dispositivo só podem receber `8` (controle remoto), `16`, `32`, etc.
+- **Conta de Serviço (`gtv_service` / admin):**
+  - Conta interna que o backend do gt_viewer utiliza via WebSocket (`/control.ashx`).
+  - Possui `siteadmin: 0xFFFFFFFF` para poder gerenciar usuários espelho (`adduser`, `users`), atribuir direitos (`adddeviceuser`) e forçar encerramento de sessões (`closeusersessions`).
+
+### 6.3 Criptografia do Token de Login (AES-256-GCM)
+
+Compatibilidade bidirecional validada entre C# (.NET 10 `System.Security.Cryptography.AesGcm`) e Node.js (`decodeCookieAESGCM` em `meshcentral.js:4000`):
+
+1. **Chave de Criptografia:**
+   - 80 bytes (160 caracteres hexadecimais), fixada em `config/meshcentral/config.json` sob `settings.loginCookieEncryptionKey`.
+   - O MeshCentral utiliza os primeiros 32 bytes (`key.slice(0, 32)`) para o algoritmo `aes-256-gcm`.
+2. **Payload JSON:**
+   ```json
+   {
+     "u": "user//gtv_mirror_<username>",
+     "a": 3,
+     "expire": 2,
+     "time": 1793980926
+   }
+   ```
+   - `u`: Usuário espelho no domínio padrão (`user//<nome>`).
+   - `a: 3`: Identificador de token de login único.
+   - `expire: 2`: Validade em minutos (2 minutos).
+   - `time`: Unix timestamp em segundos no momento da geração.
+3. **Estrutura Binária do Token:**
+   - `[12 bytes IV]` + `[16 bytes AuthTag]` + `[Ciphertext]`.
+   - Codificado em Base64 com substituições: `+` vira `@` e `/` vira `$`.
+4. **URL Final no iframe:**
+   ```
+   https://mesh.<dominio>/?login=<token>&gotonode=<nodeId>&viewmode=11&hide=31
+   ```
+
+### 6.4 Derrubada Ativa de Sessão / Túnel e Detecção de Consentimento
+
+1. **Encerramento Imediato da Sessão:**
+   - Para encerrar ativamente a sessão e o túnel de tela (ao clicar "Encerrar", ao expirar 60 min, ou na detecção de saída do usuário):
+     1. Disparo de comando de console via WebSocket:
+        `{ "action": "serverconsole", "value": "closeusersessions gtv_mirror_<username>" }`
+        O MeshCentral envia `stopped: "Administrator forced disconnection"` para o WebSocket do navegador no iframe e fecha os sockets de relay (`ws.close()`), derrubando imediatamente o túnel.
+     2. Revogação atômica dos direitos no dispositivo:
+        `{ "action": "adddeviceuser", "nodeid": "<nodeId>", "usernames": ["gtv_mirror_<username>"], "remove": true }`
+        Garante que qualquer tentativa residual de reconexão seja rejeitada com `Access denied`.
+2. **Detecção do Desfecho do Consentimento:**
+   - O agente Windows (`meshcore.js`) emite eventos estruturados recebidos no `control.ashx`:
+     - `msgid: 30`: *"Starting remote desktop after local user accepted"* → Consentimento concedido; o gt_viewer confirma o início da sessão.
+     - `msgid: 34`: *"Failed to start remote desktop after local user rejected"* → Usuário clicou em recusar ou o timeout de 60 segundos expirou sem resposta. O gt_viewer detecta `msgid: 34`, libera a trava atômica no banco e revoga o direito no MeshCentral.
+     - `msgid: 29`: *"Remote Desktop Connection forcefully closed by local user"* → Usuário encerrou o suporte pela barra de privacidade fixa.
+     - `msgid: 53`: *"Locking remote user out of desktop"* → Bloqueio de tela (`Win+L`) ou encerramento de sessão do usuário no Windows. A sessão de tela é terminada na hora.
+
+### 6.5 Matriz de Caminhos do Proxy Reverso (Caddy)
+
+Lista fechada de caminhos permitidos na porta 443:
+
+| Domínio | Caminho | Acesso Permitido | Finalidade |
+|---|---|---|---|
+| `mesh.<dominio>` | `/agent.ashx*` | **Público (WAN e Interno)** | Conexão principal do agente MeshCentral (WebSocket e HTTP). |
+| `mesh.<dominio>` | `/meshrelay.ashx*` | **Público (WAN e Interno)** | Túnel de dados de relay entre o agente e o servidor. |
+| `mesh.<dominio>` | `/` (com token) | **Rede Interna Apenas** | Renderização do iframe de tela remota (`viewmode=11&hide=31`). |
+| `mesh.<dominio>` | `/styles/*`, `/scripts/*`, `/images/*`, `/fonts/*` | **Rede Interna Apenas** | Assets estáticos para execução do canvas no navegador do técnico. |
+| `mesh.<dominio>` | `/control.ashx` | **Rede Interna Apenas** | Canal de controle do navegador no iframe e da conta de serviço. |
+| `mesh.<dominio>` | Demais caminhos / Painel admin | **Rede Interna Apenas** | Restrito a administradores na rede corporativa. Bloqueado na WAN (403). |
+| `gtviewer.<dominio>` | `/agente/*` | **Público (WAN e Interno)** | Endpoints de token temporário chamados pelos scripts das máquinas. |
+| `gtviewer.<dominio>` | Todos os demais caminhos (`/`, `/RemoteSupport`, etc.) | **Rede Interna Apenas** | Interface web do gt_viewer. Bloqueado na WAN (403). |
+
+

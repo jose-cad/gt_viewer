@@ -126,6 +126,153 @@ public class MeshCentralPocClient : IAsyncDisposable
         return ParseRunCommandResult(rawOutput);
     }
 
+    public async Task<string> EnsureMirrorUserAsync(string technicianUsername, TimeSpan timeout)
+    {
+        var mirrorUsername = technicianUsername.StartsWith("gtv_mirror_")
+            ? technicianUsername
+            : $"gtv_mirror_{technicianUsername}";
+
+        var responseId = "gtv_users_" + Guid.NewGuid().ToString("N")[..8];
+        var tcs = new TaskCompletionSource<JsonNode?>();
+        lock (_pendingResponses)
+        {
+            _pendingResponses[responseId] = tcs;
+        }
+
+        await SendActionAsync(new { action = "users", responseid = responseId, tag = responseId });
+
+        using var cts = new CancellationTokenSource(timeout);
+        cts.Token.Register(() => tcs.TrySetCanceled());
+        var res = await tcs.Task;
+
+        var users = res?["users"]?.AsArray();
+        var exists = false;
+        if (users != null)
+        {
+            foreach (var u in users)
+            {
+                var name = u?["name"]?.ToString();
+                if (string.Equals(name, mirrorUsername, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!exists)
+        {
+            var addResponseId = "gtv_adduser_" + Guid.NewGuid().ToString("N")[..8];
+            var addTcs = new TaskCompletionSource<JsonNode?>();
+            lock (_pendingResponses)
+            {
+                _pendingResponses[addResponseId] = addTcs;
+            }
+
+            // Cria usuário espelho sem senha e sem privilégios globais (siteadmin: 0)
+            await SendActionAsync(new
+            {
+                action = "adduser",
+                username = mirrorUsername,
+                email = $"{mirrorUsername}@local",
+                siteadmin = 0,
+                responseid = addResponseId
+            });
+
+            using var addCts = new CancellationTokenSource(timeout);
+            addCts.Token.Register(() => addTcs.TrySetCanceled());
+            await addTcs.Task;
+        }
+
+        return mirrorUsername;
+    }
+
+    public async Task<string> GrantRemoteDesktopRightsAsync(string nodeId, string technicianUsername, TimeSpan timeout)
+    {
+        var mirrorUsername = technicianUsername.StartsWith("gtv_mirror_")
+            ? technicianUsername
+            : $"gtv_mirror_{technicianUsername}";
+
+        var responseId = "gtv_grant_" + Guid.NewGuid().ToString("N")[..8];
+        var tcs = new TaskCompletionSource<JsonNode?>();
+        lock (_pendingResponses)
+        {
+            _pendingResponses[responseId] = tcs;
+        }
+
+        // Concede estritamente o bitmask 8 (MESHRIGHT_REMOTECONTROL), sem console (16), sem arquivos (32), sem comandos (131072)
+        await SendActionAsync(new
+        {
+            action = "adddeviceuser",
+            nodeid = nodeId,
+            usernames = new[] { mirrorUsername },
+            rights = 8,
+            responseid = responseId
+        });
+
+        using var cts = new CancellationTokenSource(timeout);
+        cts.Token.Register(() => tcs.TrySetCanceled());
+        var res = await tcs.Task;
+        return res?["result"]?.ToString() ?? "ok";
+    }
+
+    public async Task<string> RevokeRemoteDesktopRightsAsync(string nodeId, string technicianUsername, TimeSpan timeout)
+    {
+        var mirrorUsername = technicianUsername.StartsWith("gtv_mirror_")
+            ? technicianUsername
+            : $"gtv_mirror_{technicianUsername}";
+
+        var responseId = "gtv_revoke_" + Guid.NewGuid().ToString("N")[..8];
+        var tcs = new TaskCompletionSource<JsonNode?>();
+        lock (_pendingResponses)
+        {
+            _pendingResponses[responseId] = tcs;
+        }
+
+        // Revoga os direitos na máquina (remove: true)
+        await SendActionAsync(new
+        {
+            action = "adddeviceuser",
+            nodeid = nodeId,
+            usernames = new[] { mirrorUsername },
+            remove = true,
+            responseid = responseId
+        });
+
+        using var cts = new CancellationTokenSource(timeout);
+        cts.Token.Register(() => tcs.TrySetCanceled());
+        var res = await tcs.Task;
+        return res?["result"]?.ToString() ?? "ok";
+    }
+
+    public async Task<string> DropUserSessionsAsync(string technicianUsername, TimeSpan timeout)
+    {
+        var mirrorUsername = technicianUsername.StartsWith("gtv_mirror_")
+            ? technicianUsername
+            : $"gtv_mirror_{technicianUsername}";
+
+        var responseId = "gtv_dropsess_" + Guid.NewGuid().ToString("N")[..8];
+        var tcs = new TaskCompletionSource<JsonNode?>();
+        lock (_pendingResponses)
+        {
+            _pendingResponses[responseId] = tcs;
+        }
+
+        // Força desconexão imediata de todas as sessões WebSocket do usuário espelho via comando serverconsole
+        await SendActionAsync(new
+        {
+            action = "serverconsole",
+            value = $"closeusersessions {mirrorUsername}",
+            tag = responseId,
+            responseid = responseId
+        });
+
+        using var cts = new CancellationTokenSource(timeout);
+        cts.Token.Register(() => tcs.TrySetCanceled());
+        var res = await tcs.Task;
+        return res?["value"]?.ToString() ?? res?["result"]?.ToString() ?? "ok";
+    }
+
     public static RunCommandResult ParseRunCommandResult(string output)
     {
         var resultMatch = Regex.Match(output, @"GTV-RESULT=([^\r\n]+)");
@@ -179,7 +326,7 @@ public class MeshCentralPocClient : IAsyncDisposable
             if (node == null) return;
 
             var action = node["action"]?.ToString();
-            var responseId = node["responseid"]?.ToString();
+            var responseId = node["responseid"]?.ToString() ?? node["tag"]?.ToString();
 
             // Serverinfo
             if (action == "serverinfo")

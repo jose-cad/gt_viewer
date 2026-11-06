@@ -1,18 +1,43 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GtViewer.Poc;
+using GtViewer.Web.Models;
+using GtViewer.Web.Services;
 
 Console.WriteLine("=================================================");
 Console.WriteLine(" gt_viewer - Teste de Conceito: MeshCentral (PoC)");
 Console.WriteLine("=================================================");
 
-var url = Environment.GetEnvironmentVariable("MESHCENTRAL_URL") ?? "wss://localhost/control.ashx";
+var url = Environment.GetEnvironmentVariable("MESHCENTRAL_URL") ?? "wss://mesh.localhost/control.ashx";
 var user = Environment.GetEnvironmentVariable("MESHCENTRAL_USER") ?? "admin";
 var pass = Environment.GetEnvironmentVariable("MESHCENTRAL_PASS") ?? "admin_dev_password_123";
 
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "all";
 var targetNodeId = args.Length > 1 ? args[1] : null;
 var extraArg = args.Length > 2 ? args[2] : null;
+
+var hexKey = Environment.GetEnvironmentVariable("MESHCENTRAL_COOKIE_KEY") ??
+             "9ae4fb0b32a70e6fecb808f07ed6259ecb5336327b9aef2ac2c46b9d0b0f10a3ddfa47147b4c6dfe484a2042e255b07def08ca68d26c4ad0bc782ead178700525f3b707ab9493c940ff40b9cddfdc3c0";
+var tokenService = new MeshLoginTokenService(hexKey, "https://mesh.localhost");
+
+if (command == "token")
+{
+    var targetUser = targetNodeId ?? "joao";
+    var mirrorUser = targetUser.StartsWith("gtv_mirror_") ? targetUser : $"gtv_mirror_{targetUser}";
+    var token = tokenService.GenerateLoginToken(mirrorUser, expireMinutes: 2);
+    var sampleNode = extraArg ?? "node//sample_node_123";
+    var remoteUrl = tokenService.BuildRemoteDesktopUrl(token, sampleNode, viewmode: 11, hide: 31);
+
+    Console.WriteLine($"[PoC] Token gerado para usuário espelho '{mirrorUser}':");
+    Console.WriteLine($"Token: {token}");
+    Console.WriteLine($"URL Iframe (viewmode=11, hide=31):");
+    Console.WriteLine(remoteUrl);
+
+    var decrypted = tokenService.DecryptLoginToken(token);
+    Console.WriteLine($"Decifrado com sucesso: User={decrypted?.User}, Expire={decrypted?.ExpireMinutes}min, Time={decrypted?.Time}");
+    Console.WriteLine($"Válido agora: {tokenService.IsTokenValid(decrypted)}");
+    return;
+}
 
 await using var client = new MeshCentralPocClient(new Uri(url), user, pass);
 
@@ -38,6 +63,54 @@ try
             tcs.TrySetResult();
         };
         await tcs.Task;
+        return;
+    }
+
+    // Comandos de Suporte Remoto da Tarefa 4
+    if (command == "mirror")
+    {
+        var targetUser = targetNodeId ?? "joao";
+        var mirrorUser = await client.EnsureMirrorUserAsync(targetUser, TimeSpan.FromSeconds(5));
+        Console.WriteLine($"[PoC] Usuário espelho garantido no MeshCentral: '{mirrorUser}'");
+        return;
+    }
+
+    if (command == "grant-remote")
+    {
+        if (string.IsNullOrEmpty(targetNodeId))
+        {
+            Console.WriteLine("[PoC] Erro: NodeId obrigatorio.");
+            Console.WriteLine("Uso: dotnet run --project tools/GtViewer.Poc grant-remote <nodeId> [usuario_tecnico]");
+            return;
+        }
+
+        var targetUser = extraArg ?? "joao";
+        var mirrorUser = await client.EnsureMirrorUserAsync(targetUser, TimeSpan.FromSeconds(5));
+        var res = await client.GrantRemoteDesktopRightsAsync(targetNodeId, mirrorUser, TimeSpan.FromSeconds(5));
+        Console.WriteLine($"[PoC] Direitos de tela concedidos: NodeId='{targetNodeId}', Usuário='{mirrorUser}', Rights=8 (0x08). Resultado: {res}");
+        return;
+    }
+
+    if (command == "revoke-remote")
+    {
+        if (string.IsNullOrEmpty(targetNodeId))
+        {
+            Console.WriteLine("[PoC] Erro: NodeId obrigatorio.");
+            Console.WriteLine("Uso: dotnet run --project tools/GtViewer.Poc revoke-remote <nodeId> [usuario_tecnico]");
+            return;
+        }
+
+        var targetUser = extraArg ?? "joao";
+        var res = await client.RevokeRemoteDesktopRightsAsync(targetNodeId, targetUser, TimeSpan.FromSeconds(5));
+        Console.WriteLine($"[PoC] Direitos revogados no nó: NodeId='{targetNodeId}', Usuário='{targetUser}'. Resultado: {res}");
+        return;
+    }
+
+    if (command == "drop-session")
+    {
+        var targetUser = targetNodeId ?? "joao";
+        var res = await client.DropUserSessionsAsync(targetUser, TimeSpan.FromSeconds(5));
+        Console.WriteLine($"[PoC] Sessões encerradas: Usuário='{targetUser}'. Resposta: {res}");
         return;
     }
 

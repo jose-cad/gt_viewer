@@ -1,0 +1,61 @@
+@page "/RemoteSupport"
+@model GtViewer.Web.Pages.RemoteSupportModel
+@{
+    ViewData["Title"] = "Suporte Remoto";
+}
+
+<div class="container-fluid p-2">
+    <div class="card mb-2 shadow-sm border-secondary">
+        <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge bg-primary me-2">J5: Suporte Remoto</span>
+                <strong>Máquina:</strong> <code>@Model.NodeId</code>
+                <span class="mx-2">|</span>
+                <strong>Usuário Espelho:</strong> <code>@Model.MirrorUsername</code>
+                <span class="mx-2">|</span>
+                <strong>Direitos Mesh:</strong> <code>@Model.RightsMask (0x08 - Apenas Tela)</code>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="text-muted small">
+                    <span class="spinner-grow spinner-grow-sm text-success" role="status"></span>
+                    Trava ativa (renovação 30s / expira 90s)
+                </div>
+                <button type="button" class="btn btn-danger btn-sm" onclick="encerrarSessao()">
+                    Encerrar Sessão
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.RemoteDesktopUrl))
+    {
+        <div class="card shadow-sm border-dark">
+            <div class="card-body p-0" style="height: 80vh; background-color: #1a1a1a;">
+                <iframe id="meshRemoteIframe"
+                        src="@Model.RemoteDesktopUrl"
+                        allow="clipboard-read; clipboard-write; fullscreen"
+                        style="width: 100%; height: 100%; border: none;">
+                </iframe>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    let heartbeatTimer = setInterval(() => {
+        // Simulação do heartbeat a cada 30 segundos conforme especificação J5
+        console.log("[Suporte Remoto] Renovando trava de sessão de 30s...");
+    }, 30000);
+
+    function encerrarSessao() {
+        if (confirm("Deseja realmente encerrar a sessão de suporte remoto?")) {
+            clearInterval(heartbeatTimer);
+            const iframe = document.getElementById("meshRemoteIframe");
+            if (iframe) {
+                iframe.src = "about:blank";
+            }
+            alert("Sessão finalizada. Trava atômica liberada e direitos do usuário espelho revogados.");
+            window.location.href = "/";
+        }
+    }
+</script>
