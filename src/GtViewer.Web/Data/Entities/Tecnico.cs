@@ -26,6 +26,11 @@ public class Tecnico
     public int TentativasFalhas { get; set; } = 0;
     public DateTimeOffset? TravadoAte { get; set; } // Travamento temporário por 15 min após 5 erros
 
+    // Conta de Emergência (Invariante 6 e Tarefa 6)
+    public bool IsContaEmergencia { get; set; } = false;
+    public string? SenhaLocalHash { get; set; } // Hash de senha para conta local de emergência
+    public DateTimeOffset? EmergenciaExpiraEm { get; set; } // Expira em até 24h após ser habilitada
+
     public DateTimeOffset CriadoEm { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset AtualizadoEm { get; set; } = DateTimeOffset.UtcNow;
 

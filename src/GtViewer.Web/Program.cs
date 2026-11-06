@@ -1,19 +1,57 @@
 using GtViewer.Web.Data;
 using GtViewer.Web.Models;
+using GtViewer.Web.Security;
 using GtViewer.Web.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeFolder("/");
+    options.Conventions.AllowAnonymousToPage("/Login");
+    options.Conventions.AllowAnonymousToPage("/Login/Ativacao");
+    options.Conventions.AllowAnonymousToPage("/Login/Verificar2Fa");
+    options.Conventions.AllowAnonymousToPage("/Error");
+});
 
 builder.Services.AddDbContext<GtViewerDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
     options.UseNpgsql(connectionString);
 });
+
+builder.Services.AddDataProtection();
+
+// Autenticação baseada em Cookie com expiração absoluta de 8 horas e reconferência periódica no AD
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.AccessDeniedPath = "/error?code=403";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8); // Limite de 8 horas conforme especificação J1
+        options.SlidingExpiration = false; // Expiração estrita/absoluta
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.EventsType = typeof(AdSessionRecheckEvents);
+    });
+
+builder.Services.AddScoped<AdSessionRecheckEvents>();
+builder.Services.AddScoped<IAuditoriaService, AuditoriaService>();
+builder.Services.AddScoped<ILdapService, LdapService>();
+builder.Services.AddSingleton<ITotpService, TotpService>();
+builder.Services.AddSingleton<IActivationCodeService, ActivationCodeService>();
+builder.Services.AddSingleton<ILoginSecurityService, LoginSecurityService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IServerCliService, ServerCliService>();
+
+builder.Services.Configure<LdapOptions>(
+    builder.Configuration.GetSection(LdapOptions.SectionName));
 
 builder.Services.Configure<MeshCentralOptions>(
     builder.Configuration.GetSection(MeshCentralOptions.SectionName));
@@ -28,6 +66,57 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 
+// Execução de comandos administrativos CLI no servidor (Invariante 183 / Tarefa 6)
+if (args.Length > 0 && (args[0] == "--create-admin" || args[0] == "--setup-emergency" || args[0] == "--enable-emergency"))
+{
+    using var scope = app.Services.CreateScope();
+    var cliService = scope.ServiceProvider.GetRequiredService<IServerCliService>();
+
+    try
+    {
+        if (args[0] == "--create-admin")
+        {
+            if (args.Length < 3)
+            {
+                Console.WriteLine("Uso: dotnet run -- --create-admin <usuario_dominio> <nome_exibicao> [email]");
+                return;
+            }
+            var output = await cliService.CreateFirstAdminAsync(args[1], args[2], args.Length > 3 ? args[3] : null);
+            Console.WriteLine(output);
+            return;
+        }
+        else if (args[0] == "--setup-emergency")
+        {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Uso: dotnet run -- --setup-emergency <senha>");
+                return;
+            }
+            var output = await cliService.SetupEmergencyAccountAsync(args[1]);
+            Console.WriteLine(output);
+            return;
+        }
+        else if (args[0] == "--enable-emergency")
+        {
+            var hours = 24;
+            if (args.Length > 1 && int.TryParse(args[1], out var parsedHours))
+            {
+                hours = parsedHours;
+            }
+            var output = await cliService.EnableEmergencyAccountAsync(hours);
+            Console.WriteLine(output);
+            return;
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"[ERRO CLI]: {ex.Message}");
+        Console.ResetColor();
+        return;
+    }
+}
+
 app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
@@ -39,6 +128,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();

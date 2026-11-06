@@ -1,0 +1,77 @@
+@page "/login/ativacao"
+@model GtViewer.Web.Pages.Login.AtivacaoModel
+@{
+    ViewData["Title"] = "Ativação de Conta e 2FA";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <h3 class="fw-bold text-primary">Primeiro Acesso</h3>
+                    <p class="text-muted">Configuração de Verificação em Duas Etapas (2FA)</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @Model.ErrorMessage
+                    </div>
+                }
+
+                @if (string.IsNullOrEmpty(Model.QrCodeSvg))
+                {
+                    <!-- Passo 1: Informar Código de Ativação -->
+                    <p class="small text-muted">
+                        Para o primeiro acesso ou após redefinição de segurança, insira o <strong>código de ativação</strong> de 16 dígitos fornecido pelo administrador.
+                    </p>
+
+                    <form method="post" asp-page-handler="ValidarCodigo">
+                        <input type="hidden" name="TecnicoId" value="@Model.TecnicoId" />
+                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+
+                        <div class="mb-4">
+                            <label for="CodigoAtivacao" class="form-label">Código de Ativação</label>
+                            <input type="text" class="form-control form-control-lg text-center font-monospace" id="CodigoAtivacao" name="CodigoAtivacao" placeholder="XXXX-XXXX-XXXX-XXXX" required autofocus autocomplete="off" />
+                            <div class="form-text">Válido por 24 horas (máximo 5 tentativas).</div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Validar Código</button>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <!-- Passo 2: Cadastrar Aplicativo Autenticador -->
+                    <div class="text-center mb-3">
+                        <p class="small text-muted">Escaneie o QR Code abaixo no seu aplicativo autenticador (Google Authenticator, Microsoft Authenticator, etc.):</p>
+                        <div class="p-3 bg-white d-inline-block border rounded mb-3">
+                            @Html.Raw(Model.QrCodeSvg)
+                        </div>
+                        <p class="small text-muted font-monospace">Ou digite a chave manualmente: <br /><strong>@Model.PlainSecret</strong></p>
+                    </div>
+
+                    <form method="post" asp-page-handler="Confirmar2Fa">
+                        <input type="hidden" name="TecnicoId" value="@Model.TecnicoId" />
+                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                        <input type="hidden" name="PlainSecret" value="@Model.PlainSecret" />
+
+                        <div class="mb-4">
+                            <label for="TotpCode" class="form-label text-center d-block">Código de 6 dígitos gerado pelo aplicativo</label>
+                            <input type="text" class="form-control form-control-lg text-center font-monospace" id="TotpCode" name="TotpCode" maxlength="6" placeholder="000000" required autofocus autocomplete="one-time-code" />
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg">Confirmar e Entrar</button>
+                        </div>
+                    </form>
+                }
+            </div>
+            <div class="card-footer bg-light text-center py-3">
+                <a asp-page="/Login" class="text-decoration-none small text-muted">Voltar para o início</a>
+            </div>
+        </div>
+    </div>
+</div>

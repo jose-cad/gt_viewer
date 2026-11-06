@@ -37,6 +37,7 @@ public class GtViewerDbContext : DbContext
             b.Property(t => t.Email).HasMaxLength(256);
             b.Property(t => t.Permissoes).HasMaxLength(500).IsRequired();
             b.Property(t => t.CodigoAtivacaoHash).HasMaxLength(128);
+            b.Property(t => t.SenhaLocalHash).HasMaxLength(256);
         });
 
         // 2. Maquina
