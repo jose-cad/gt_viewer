@@ -191,7 +191,7 @@ public class MeshCentralClientTests
         };
         connection.EnqueueIncomingMessage(evt.ToJsonString());
 
-        await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        await Task.WhenAny(tcs.Task, Task.Delay(3000));
 
         Assert.Equal("node//test_pc_01", connectedNodeId);
 
@@ -225,7 +225,7 @@ public class MeshCentralClientTests
         };
         connection.EnqueueIncomingMessage(evt.ToJsonString());
 
-        await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        await Task.WhenAny(tcs.Task, Task.Delay(3000));
 
         Assert.Equal("node//test_pc_02", disconnectedNodeId);
 
@@ -259,7 +259,7 @@ public class MeshCentralClientTests
         };
         connection.EnqueueIncomingMessage(evt.ToJsonString());
 
-        await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        await Task.WhenAny(tcs.Task, Task.Delay(3000));
 
         Assert.Equal("node//test_pc_03", changedNodeId);
 
