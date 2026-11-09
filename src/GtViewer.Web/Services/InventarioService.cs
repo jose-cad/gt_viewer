@@ -14,6 +14,7 @@ public class InventarioService : IInventarioService
     private readonly GtViewerDbContext _dbContext;
     private readonly IAuditoriaService _auditoriaService;
     private readonly IRescuePasswordService _rescuePasswordService;
+    private readonly IFilaAcoesService? _filaAcoesService;
     private readonly ILogger<InventarioService> _logger;
 
     private static readonly HashSet<string> GenericSerials = new(StringComparer.OrdinalIgnoreCase)
@@ -37,12 +38,14 @@ public class InventarioService : IInventarioService
         GtViewerDbContext dbContext,
         IAuditoriaService auditoriaService,
         IRescuePasswordService rescuePasswordService,
-        ILogger<InventarioService> logger)
+        ILogger<InventarioService> logger,
+        IFilaAcoesService? filaAcoesService = null)
     {
         _dbContext = dbContext;
         _auditoriaService = auditoriaService;
         _rescuePasswordService = rescuePasswordService;
         _logger = logger;
+        _filaAcoesService = filaAcoesService;
     }
 
     public static bool IsSerialGenerico(string? serial)
@@ -181,27 +184,39 @@ public class InventarioService : IInventarioService
         // Cria ação de fila e auditoria para garantir a conta de resgate
         if (!normalizedSerial.StartsWith("SEM_SERIE_"))
         {
-            var acao = new Acao
+            if (_filaAcoesService != null)
             {
-                MaquinaId = novaMaquina.Id,
-                Tipo = "garantir_resgate",
-                Prioridade = 1,
-                Estado = "pendente",
-                Ator = "sistema",
-                ParametrosJson = "{\"motivo\":\"Cadastro inicial de máquina\"}",
-                CriadoEm = DateTimeOffset.UtcNow
-            };
-            _dbContext.Acoes.Add(acao);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+                await _filaAcoesService.EnfileirarAcaoAsync(
+                    novaMaquina.Id,
+                    "garantir_resgate",
+                    "sistema",
+                    "{\"motivo\":\"Cadastro inicial de máquina\"}",
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                var acao = new Acao
+                {
+                    MaquinaId = novaMaquina.Id,
+                    Tipo = "garantir_resgate",
+                    Prioridade = 1,
+                    Estado = "pendente",
+                    Ator = "sistema",
+                    ParametrosJson = "{\"motivo\":\"Cadastro inicial de máquina\"}",
+                    CriadoEm = DateTimeOffset.UtcNow
+                };
+                _dbContext.Acoes.Add(acao);
+                await _dbContext.SaveChangesAsync(cancellationToken);
 
-            await _auditoriaService.RegistrarAsync(
-                ator: "sistema",
-                tipo: TiposAuditoria.GarantirContaResgate,
-                alvo: novaMaquina.NumeroSerie,
-                maquinaId: novaMaquina.Id,
-                acaoId: acao.Id,
-                detalhesJson: "{\"acao\":\"garantir_conta_resgate_inicial\"}",
-                cancellationToken: cancellationToken);
+                await _auditoriaService.RegistrarAsync(
+                    ator: "sistema",
+                    tipo: TiposAuditoria.GarantirContaResgate,
+                    alvo: novaMaquina.NumeroSerie,
+                    maquinaId: novaMaquina.Id,
+                    acaoId: acao.Id,
+                    detalhesJson: "{\"acao\":\"garantir_conta_resgate_inicial\"}",
+                    cancellationToken: cancellationToken);
+            }
         }
 
         // Histórico de usuários

@@ -51,6 +51,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 builder.Services.AddScoped<IServerCliService, ServerCliService>();
 builder.Services.AddSingleton<IRescuePasswordService, RescuePasswordService>();
+builder.Services.AddSingleton<IAgentScriptProvider, AgentScriptProvider>();
+builder.Services.AddScoped<IFilaAcoesService, FilaAcoesService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
 
 builder.Services.AddAuthorization(options =>
@@ -72,6 +74,7 @@ builder.Services.AddSingleton<MeshCentralClient>();
 builder.Services.AddSingleton<IMeshCentralClient>(sp => sp.GetRequiredService<MeshCentralClient>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MeshCentralClient>());
 builder.Services.AddHostedService<InventarioBackgroundService>();
+builder.Services.AddHostedService<FilaAcoesBackgroundService>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
