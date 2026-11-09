@@ -38,6 +38,12 @@ public class AdSessionRecheckEvents : CookieAuthenticationEvents
         var tecnico = await dbContext.Tecnicos.FirstOrDefaultAsync(t => t.UsuarioDominio.ToLower() == username.ToLower());
         if (tecnico == null || !tecnico.Ativo)
         {
+            var suporteService = context.HttpContext.RequestServices.GetService<Services.ISuporteRemotoService>();
+            if (suporteService != null)
+            {
+                await suporteService.EncerrarSessoesTecnicoDesativadoAsync(username);
+            }
+
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync();
             await auditoriaService.RegistrarAsync(username, TiposAuditoria.CriarAlterarDesativarTecnico, "gt_viewer", false, "Sessão encerrada imediatamente devido à desativação do técnico");
@@ -85,6 +91,12 @@ public class AdSessionRecheckEvents : CookieAuthenticationEvents
             // Conta desativada no AD -> encerra a sessão imediatamente
             tecnico.Ativo = false;
             await dbContext.SaveChangesAsync();
+
+            var suporteService = context.HttpContext.RequestServices.GetService<Services.ISuporteRemotoService>();
+            if (suporteService != null)
+            {
+                await suporteService.EncerrarSessoesTecnicoDesativadoAsync(username);
+            }
 
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync();

@@ -15,6 +15,7 @@ public class InventarioService : IInventarioService
     private readonly IAuditoriaService _auditoriaService;
     private readonly IRescuePasswordService _rescuePasswordService;
     private readonly IFilaAcoesService? _filaAcoesService;
+    private readonly ISuporteRemotoService? _suporteRemotoService;
     private readonly ILogger<InventarioService> _logger;
 
     private static readonly HashSet<string> GenericSerials = new(StringComparer.OrdinalIgnoreCase)
@@ -39,13 +40,15 @@ public class InventarioService : IInventarioService
         IAuditoriaService auditoriaService,
         IRescuePasswordService rescuePasswordService,
         ILogger<InventarioService> logger,
-        IFilaAcoesService? filaAcoesService = null)
+        IFilaAcoesService? filaAcoesService = null,
+        ISuporteRemotoService? suporteRemotoService = null)
     {
         _dbContext = dbContext;
         _auditoriaService = auditoriaService;
         _rescuePasswordService = rescuePasswordService;
         _logger = logger;
         _filaAcoesService = filaAcoesService;
+        _suporteRemotoService = suporteRemotoService;
     }
 
     public static bool IsSerialGenerico(string? serial)
@@ -111,6 +114,7 @@ public class InventarioService : IInventarioService
         // 1. Localiza por NodeId existente
         var maquina = await _dbContext.Maquinas
             .Include(m => m.HistoricoUsuarios)
+            .Include(m => m.TravaSessao)
             .FirstOrDefaultAsync(m => m.NodeId == nodeId, cancellationToken);
 
         if (maquina != null)
@@ -122,6 +126,23 @@ public class InventarioService : IInventarioService
             }
 
             ApplyTelemetry(maquina, model, manufacturer, osDesc, arch, hostname, isOnline, avName, avActive, avUpdated, currentUsers);
+
+            // J5 / Invariante 9: Se o usuário que consentiu não estiver mais presente, encerra o suporte remoto imediatamente
+            if (maquina.TravaSessao != null)
+            {
+                var consentUser = maquina.TravaSessao.UsuarioLogadoNoMomento;
+                if (!currentUsers.Any(u => string.Equals(u, consentUser, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (_suporteRemotoService != null)
+                    {
+                        await _suporteRemotoService.EncerrarSessaoAsync(
+                            maquina.TravaSessao.IdentificadorSessao,
+                            $"Usuário que consentiu ({consentUser}) encerrou a sessão no Windows (logoff ou bloqueio de tela).",
+                            cancellationToken);
+                    }
+                }
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken);
             return;
         }

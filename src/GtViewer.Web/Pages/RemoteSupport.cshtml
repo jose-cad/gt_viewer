@@ -5,15 +5,18 @@
 }
 
 <div class="container-fluid p-2">
-    @if (!Model.IsMeshConnected || !string.IsNullOrEmpty(Model.ErrorMessage))
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
         <div class="alert alert-danger shadow-sm my-3 p-4" role="alert" id="meshcentral-refusal-alert">
             <h4 class="alert-heading"><i class="bi bi-x-octagon-fill text-danger me-2"></i> Acesso à Tela Remota Recusado</h4>
-            <p class="mb-2">@(Model.ErrorMessage ?? "O servidor MeshCentral está desconectado. Ação de suporte remoto recusada.")</p>
+            <p class="mb-2">@Model.ErrorMessage</p>
             <hr />
-            <p class="mb-0 small text-muted">
-                Conforme os requisitos de resiliência e auditoria, nenhuma tela remota pode ser iniciada enquanto a conexão com o servidor de agentes estiver inativa.
+            <p class="mb-3 small text-muted">
+                Conforme os requisitos da especificação (J5, Invariante 9), o acesso à tela remota exige conexão ativa com o servidor de agentes e a presença/consentimento de um usuário logado no Windows.
             </p>
+            <a asp-page="/Maquinas/Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar ao Inventário
+            </a>
         </div>
     }
     else
@@ -22,7 +25,9 @@
             <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <span class="badge bg-primary me-2">J5: Suporte Remoto</span>
-                    <strong>Máquina:</strong> <code>@Model.NodeId</code>
+                    <strong>Máquina:</strong> <code>@(Model.MachineHostname ?? Model.NodeId)</code>
+                    <span class="mx-2">|</span>
+                    <strong>Usuário Windows:</strong> <code>@(Model.UsuarioAlvo ?? "N/A")</code>
                     <span class="mx-2">|</span>
                     <strong>Usuário Espelho:</strong> <code>@Model.MirrorUsername</code>
                     <span class="mx-2">|</span>
@@ -31,11 +36,13 @@
                 <div class="d-flex align-items-center gap-3">
                     <div class="text-muted small">
                         <span class="spinner-grow spinner-grow-sm text-success" role="status"></span>
-                        Trava ativa (renovação 30s / expira 90s)
+                        Trava ativa (renovação a cada 30s / expira em 90s)
                     </div>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="encerrarSessao()">
-                        Encerrar Sessão
-                    </button>
+                    <form method="post" asp-page-handler="Encerrar" asp-route-sessionId="@Model.SessionId" class="d-inline" onsubmit="return confirm('Deseja realmente encerrar a sessão de suporte remoto? A tela será imediatamente desconectada.');">
+                        <button type="submit" class="btn btn-danger btn-sm" id="btnEncerrarSessao">
+                            <i class="bi bi-power"></i> Encerrar Sessão
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -43,7 +50,7 @@
         @if (!string.IsNullOrEmpty(Model.RemoteDesktopUrl))
         {
             <div class="card shadow-sm border-dark">
-                <div class="card-body p-0" style="height: 80vh; background-color: #1a1a1a;">
+                <div class="card-body p-0" style="height: 82vh; background-color: #1a1a1a;">
                     <iframe id="meshRemoteIframe"
                             src="@Model.RemoteDesktopUrl"
                             allow="clipboard-read; clipboard-write; fullscreen"
@@ -52,22 +59,33 @@
                 </div>
             </div>
 
-            <script>
-                let heartbeatTimer = setInterval(() => {
-                    // Simulação do heartbeat a cada 30 segundos conforme especificação J5
-                    console.log("[Suporte Remoto] Renovando trava de sessão de 30s...");
-                }, 30000);
+            @Html.AntiForgeryToken()
 
-                function encerrarSessao() {
-                    if (confirm("Deseja realmente encerrar a sessão de suporte remoto?")) {
-                        clearInterval(heartbeatTimer);
-                        const iframe = document.getElementById("meshRemoteIframe");
-                        if (iframe) {
-                            iframe.src = "about:blank";
+            <script>
+                const sessionId = "@Model.SessionId";
+                let heartbeatInterval = null;
+
+                if (sessionId) {
+                    heartbeatInterval = setInterval(async () => {
+                        try {
+                            const tokenElem = document.querySelector('input[name="__RequestVerificationToken"]');
+                            const resp = await fetch(`?handler=Heartbeat&sessionId=${encodeURIComponent(sessionId)}`, {
+                                method: "POST",
+                                headers: {
+                                    "RequestVerificationToken": tokenElem ? tokenElem.value : ""
+                                }
+                            });
+
+                            if (!resp.ok) {
+                                console.warn("[SuporteRemoto] Heartbeat recusado. Sessão encerrada ou expirada.");
+                                clearInterval(heartbeatInterval);
+                                alert("A sessão de suporte remoto foi encerrada (limite atingido, desativação ou saída do usuário).");
+                                window.location.href = "/Maquinas/Index";
+                            }
+                        } catch (err) {
+                            console.error("[SuporteRemoto] Falha na requisição de heartbeat:", err);
                         }
-                        alert("Sessão finalizada. Trava atômica liberada e direitos do usuário espelho revogados.");
-                        window.location.href = "/";
-                    }
+                    }, 30000); // 30 segundos
                 }
             </script>
         }

@@ -55,6 +55,7 @@ builder.Services.AddSingleton<IAgentScriptProvider, AgentScriptProvider>();
 builder.Services.AddScoped<IFilaAcoesService, FilaAcoesService>();
 builder.Services.AddScoped<IBloqueioService, BloqueioService>();
 builder.Services.AddScoped<IReiniciarService, ReiniciarService>();
+builder.Services.AddScoped<ISuporteRemotoService, SuporteRemotoService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
 
 builder.Services.AddAuthorization(options =>
@@ -77,6 +78,7 @@ builder.Services.AddSingleton<IMeshCentralClient>(sp => sp.GetRequiredService<Me
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MeshCentralClient>());
 builder.Services.AddHostedService<InventarioBackgroundService>();
 builder.Services.AddHostedService<FilaAcoesBackgroundService>();
+builder.Services.AddHostedService<SuporteRemotoWorker>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
