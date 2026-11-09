@@ -11,10 +11,12 @@ namespace GtViewer.Web.Pages;
 public class RemoteSupportModel : PageModel
 {
     private readonly MeshLoginTokenService _tokenService;
+    private readonly IMeshCentralClient _meshClient;
 
-    public RemoteSupportModel(MeshLoginTokenService tokenService)
+    public RemoteSupportModel(MeshLoginTokenService tokenService, IMeshCentralClient meshClient)
     {
         _tokenService = tokenService;
+        _meshClient = meshClient;
     }
 
     [BindProperty(SupportsGet = true)]
@@ -28,9 +30,17 @@ public class RemoteSupportModel : PageModel
     public string? RemoteDesktopUrl { get; private set; }
     public string? LoginToken { get; private set; }
     public long RightsMask => MeshRights.MinimalRemoteDesktopRights;
+    public bool IsMeshConnected => _meshClient.IsConnected;
+    public string? ErrorMessage { get; private set; }
 
     public IActionResult OnGet()
     {
+        if (!_meshClient.IsConnected)
+        {
+            ErrorMessage = "Conexão com o servidor de agentes (MeshCentral) indisponível. Acesso à tela remota recusado.";
+            return Page();
+        }
+
         if (string.IsNullOrWhiteSpace(NodeId))
         {
             // Se nenhum nodeId foi informado, exibe a página no modo de seleção/demonstração
