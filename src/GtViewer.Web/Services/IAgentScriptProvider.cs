@@ -69,6 +69,8 @@ public class AgentScriptProvider : IAgentScriptProvider
                 "Write-Output \"GTV-RESULT=DESBLOQUEADA\"\r\nWrite-Output \"GTV-EXIT=0\"\r\n",
             "GarantirContaResgate.ps1" =>
                 "Write-Output \"GTV-RESULT=OK\"\r\nWrite-Output \"GTV-EXIT=0\"\r\n",
+            "ReiniciarMaquina.ps1" =>
+                "Write-Output \"GTV-RESULT=REINICIANDO\"\r\nWrite-Output \"GTV-EXIT=0\"\r\n",
             _ =>
                 "Write-Output \"GTV-RESULT=OK\"\r\nWrite-Output \"GTV-EXIT=0\"\r\n"
         };
