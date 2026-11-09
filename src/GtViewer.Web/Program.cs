@@ -54,6 +54,7 @@ builder.Services.AddSingleton<IRescuePasswordService, RescuePasswordService>();
 builder.Services.AddSingleton<IAgentScriptProvider, AgentScriptProvider>();
 builder.Services.AddScoped<IFilaAcoesService, FilaAcoesService>();
 builder.Services.AddScoped<IBloqueioService, BloqueioService>();
+builder.Services.AddScoped<IReiniciarService, ReiniciarService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
 
 builder.Services.AddAuthorization(options =>

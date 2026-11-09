@@ -14,17 +14,20 @@ public class DetalhesModel : PageModel
 {
     private readonly IInventarioService _inventarioService;
     private readonly IBloqueioService _bloqueioService;
+    private readonly IReiniciarService _reiniciarService;
     private readonly IMeshCentralClient _meshClient;
     private readonly GtViewerDbContext _dbContext;
 
     public DetalhesModel(
         IInventarioService inventarioService,
         IBloqueioService bloqueioService,
+        IReiniciarService reiniciarService,
         IMeshCentralClient meshClient,
         GtViewerDbContext dbContext)
     {
         _inventarioService = inventarioService;
         _bloqueioService = bloqueioService;
+        _reiniciarService = reiniciarService;
         _meshClient = meshClient;
         _dbContext = dbContext;
     }
@@ -32,6 +35,7 @@ public class DetalhesModel : PageModel
     public MaquinaDetailDto? Maquina { get; private set; }
 
     public bool PodeBloquear => User.HasPermissao(Permissoes.Bloquear);
+    public bool PodeReiniciar => User.HasPermissao(Permissoes.Reiniciar);
     public bool PodeRevelarSenha => User.HasPermissao(Permissoes.RevelarSenhaResgate);
     public bool MeshCentralConectado => _meshClient.IsConnected;
 
@@ -94,6 +98,26 @@ public class DetalhesModel : PageModel
         {
             await _bloqueioService.SolicitarDesbloqueioAsync(id, User.Identity?.Name ?? "tecnico");
             MensagemSucesso = "Desbloqueio solicitado com sucesso.";
+        }
+        catch (Exception ex)
+        {
+            MensagemErro = ex.Message;
+        }
+
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostReiniciarAsync(int id)
+    {
+        if (!PodeReiniciar)
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            await _reiniciarService.SolicitarReinicioAsync(id, User.Identity?.Name ?? "tecnico");
+            MensagemSucesso = "Comando de reinício enviado com sucesso. O computador será reiniciado em 2 minutos.";
         }
         catch (Exception ex)
         {

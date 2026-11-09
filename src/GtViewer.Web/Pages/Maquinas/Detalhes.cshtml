@@ -35,6 +35,14 @@ else
                         <i class="bi bi-display"></i> Acessar Tela
                     </a>
                 }
+                @if (Model.PodeReiniciar)
+                {
+                    <form method="post" asp-page-handler="Reiniciar" asp-route-id="@m.Id" class="d-inline" onsubmit="return confirm('Deseja realmente reiniciar este computador? O usuário receberá um aviso prévio de 2 minutos para salvar seu trabalho.');">
+                        <button type="submit" class="btn btn-outline-warning btn-sm" @(m.ConexaoEstado == "online" && Model.MeshCentralConectado ? "" : "disabled") title="@(m.ConexaoEstado != "online" ? "Reinício indisponível com a máquina offline." : !Model.MeshCentralConectado ? "Sem conexão com o servidor de máquinas (MeshCentral)." : "Reiniciar o computador com aviso de 2 minutos ao usuário")">
+                            <i class="bi bi-arrow-clockwise"></i> Reiniciar
+                        </button>
+                    </form>
+                }
                 @if (Model.PodeBloquear && m.BloqueioEstado != "bloqueada" && m.BloqueioEstado != "bloqueio_pendente")
                 {
                     <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalBloquear">

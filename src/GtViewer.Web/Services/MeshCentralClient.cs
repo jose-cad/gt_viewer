@@ -742,7 +742,8 @@ public class MeshCentralClient : IMeshCentralClient, IHostedService
 
         var restartDelay = delay ?? TimeSpan.FromMinutes(2);
         var seconds = (int)restartDelay.TotalSeconds;
-        var script = $"shutdown.exe /r /t {seconds} /c \"O computador será reiniciado pela TI em {seconds} segundos para manutenção.\"; Write-Output 'GTV-RESULT=OK'; Write-Output 'GTV-EXIT=0'";
+        var message = "A TI vai reiniciar seu computador em 2 minutos. Salve seu trabalho.";
+        var script = $"shutdown.exe /a 2>$null; shutdown.exe /r /t {seconds} /c \"{message}\" /f; Write-Output 'GTV-RESULT=OK'; Write-Output 'GTV-EXIT=0'";
 
         return await RunFixedScriptAsync(nodeId, script, timeout, cancellationToken);
     }
