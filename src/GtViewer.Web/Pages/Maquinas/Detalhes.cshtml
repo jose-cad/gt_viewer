@@ -1,0 +1,223 @@
+@page "{id:int}"
+@model GtViewer.Web.Pages.Maquinas.DetalhesModel
+@{
+    ViewData["Title"] = $"Máquina {Model.Maquina?.NumeroSerie} (J3)";
+}
+
+@if (Model.Maquina == null)
+{
+    <div class="alert alert-danger">Máquina não encontrada.</div>
+}
+else
+{
+    var m = Model.Maquina;
+    <div class="container-fluid py-2">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2>
+                    <i class="bi bi-laptop"></i> @m.NumeroSerie
+                    @if (m.SerieManual)
+                    {
+                        <span class="badge bg-info text-dark ms-2">Série Manual</span>
+                    }
+                    @if (m.EmAprovacao)
+                    {
+                        <span class="badge bg-warning text-dark ms-2">Aguardando Aprovação</span>
+                    }
+                </h2>
+                <p class="text-muted mb-0">Hostname: <code>@(m.Hostname ?? "N/A")</code> | NodeId: <code>@(m.NodeId ?? "N/A")</code></p>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-page="./Index" class="btn btn-outline-secondary btn-sm">Voltar</a>
+                @if (User.HasPermissao(GtViewer.Web.Security.Permissoes.SuporteRemoto) && m.ConexaoEstado == "online")
+                {
+                    <a asp-page="/RemoteSupport" asp-route-nodeId="@m.NodeId" class="btn btn-primary btn-sm">
+                        <i class="bi bi-display"></i> Acessar Tela
+                    </a>
+                }
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <!-- Coluna da Esquerda: Dados de Hardware e Estados -->
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light fw-bold">
+                        <i class="bi bi-info-circle"></i> Informações do Dispositivo
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Status Conexão:</dt>
+                            <dd class="col-sm-8">
+                                <span class="badge @(m.ConexaoEstado == "online" ? "bg-success" : m.ConexaoEstado == "sumida" ? "bg-danger" : "bg-secondary")">
+                                    @m.ConexaoEstado.ToUpperInvariant()
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-4">Status Bloqueio:</dt>
+                            <dd class="col-sm-8">
+                                <span class="badge @(m.BloqueioEstado == "bloqueada" ? "bg-danger" : "bg-secondary")">
+                                    @m.BloqueioEstado.ToUpperInvariant()
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-4">Contrato Locadora:</dt>
+                            <dd class="col-sm-8">
+                                <span class="badge @(m.SituacaoContrato == "no_contrato" ? "bg-success" : m.SituacaoContrato == "fora_do_contrato" ? "bg-danger" : "bg-secondary")">
+                                    @m.SituacaoContrato.Replace("_", " ").ToUpperInvariant()
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-4">Fabricante / Modelo:</dt>
+                            <dd class="col-sm-8">@(m.Fabricante ?? "-") / @(m.Modelo ?? "-")</dd>
+
+                            <dt class="col-sm-4">Sistema Operacional:</dt>
+                            <dd class="col-sm-8">@(m.SistemaOperacional ?? "-") (@(m.Arquitetura ?? "-"))</dd>
+
+                            <dt class="col-sm-4">Antivírus:</dt>
+                            <dd class="col-sm-8">
+                                <div>@(m.AntivirusNome ?? "Nenhum detectado")</div>
+                                <span class="badge @(m.AntivirusStatus == "Ativo e Atualizado" ? "bg-success" : "bg-warning text-dark")">
+                                    @m.AntivirusStatus
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-4">Grupo:</dt>
+                            <dd class="col-sm-8">@(m.GrupoNome ?? "Nenhum")</dd>
+
+                            <dt class="col-sm-4">Primeiro Contato:</dt>
+                            <dd class="col-sm-8">@(m.PrimeiroContatoEm?.ToString("dd/MM/yyyy HH:mm:ss") ?? "-")</dd>
+
+                            <dt class="col-sm-4">Último Contato:</dt>
+                            <dd class="col-sm-8">@(m.UltimoContatoEm?.ToString("dd/MM/yyyy HH:mm:ss") ?? "-")</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- Histórico de Usuários Interativos (Invariante 12) -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light fw-bold">
+                        <i class="bi bi-people"></i> Histórico de Sessões de Usuários (LGPD - 2 anos)
+                    </div>
+                    <div class="card-body p-0 table-responsive" style="max-height: 250px;">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Usuário</th>
+                                    <th>Início da Sessão</th>
+                                    <th>Fim da Sessão</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (m.HistoricoUsuarios.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-2">Nenhum histórico registrado ainda.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var h in m.HistoricoUsuarios)
+                                    {
+                                        <tr>
+                                            <td><strong>@h.Usuario</strong></td>
+                                            <td>@h.InicioEm.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>@(h.FimEm.HasValue ? h.FimEm.Value.ToString("dd/MM/yyyy HH:mm") : "Sessão Ativa")</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna da Direita: Fila de Ações e Auditoria -->
+            <div class="col-md-6">
+                <!-- Ações Pendentes / Em Execução -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light fw-bold">
+                        <i class="bi bi-list-task"></i> Ações Pendentes / Fila
+                    </div>
+                    <div class="card-body p-0 table-responsive" style="max-height: 200px;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Prioridade</th>
+                                    <th>Estado</th>
+                                    <th>Ator</th>
+                                    <th>Criado Em</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (m.AcoesPendentes.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-2">Nenhuma ação pendente na fila.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var a in m.AcoesPendentes)
+                                    {
+                                        <tr>
+                                            <td><code>@a.Tipo</code></td>
+                                            <td><span class="badge bg-secondary">P@(a.Prioridade)</span></td>
+                                            <td><span class="badge bg-info text-dark">@a.Estado</span></td>
+                                            <td>@a.Ator</td>
+                                            <td>@a.CriadoEm.ToString("dd/MM/yyyy HH:mm")</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Últimas Ações de Auditoria -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light fw-bold">
+                        <i class="bi bi-clock-history"></i> Últimas Auditorias Deste Dispositivo
+                    </div>
+                    <div class="card-body p-0 table-responsive" style="max-height: 280px;">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Ator</th>
+                                    <th>Ação Auditada</th>
+                                    <th>Resultado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (m.UltimasAuditorias.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-2">Nenhuma auditoria registrada.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var aud in m.UltimasAuditorias)
+                                    {
+                                        <tr>
+                                            <td><small>@aud.DataHora.ToString("dd/MM/yyyy HH:mm:ss")</small></td>
+                                            <td><strong>@aud.Ator</strong></td>
+                                            <td><code>@aud.Tipo</code></td>
+                                            <td>
+                                                <span class="badge @(aud.Sucesso ? "bg-success" : "bg-danger")">
+                                                    @(aud.Sucesso ? "OK" : "Falha")
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,31 @@
+@page
+@model GtViewer.Web.Pages.Maquinas.DownloadInstaladorModel
+@{
+    ViewData["Title"] = "Download do Instalador do Agente (J2)";
+}
+
+<div class="container py-3" style="max-width: 600px;">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white fw-bold">
+            <i class="bi bi-download me-2"></i> Download do Instalador do Agente (J2)
+        </div>
+        <div class="card-body">
+            <p>
+                Este instalador configura o agente do <strong>MeshCentral</strong> no notebook gerenciado, apontando para o servidor seguro da empresa na porta HTTPS padrão (443).
+            </p>
+            <div class="alert alert-info">
+                <strong><i class="bi bi-shield-check"></i> Auditoria Obrigatória:</strong>
+                Conforme a política de segurança e especificação J2, o download deste instalador é registrado no log de auditoria com seu usuário e endereço IP.
+            </div>
+
+            <form method="post" asp-page-handler="Download" class="text-center mt-3">
+                <button type="submit" class="btn btn-primary btn-lg w-100">
+                    <i class="bi bi-cloud-arrow-down-fill me-2"></i> Baixar Instalador Windows
+                </button>
+            </form>
+        </div>
+        <div class="card-footer text-end">
+            <a asp-page="./Index" class="btn btn-outline-secondary btn-sm">Voltar ao Inventário</a>
+        </div>
+    </div>
+</div>
