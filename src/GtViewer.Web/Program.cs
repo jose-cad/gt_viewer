@@ -53,6 +53,7 @@ builder.Services.AddScoped<IServerCliService, ServerCliService>();
 builder.Services.AddSingleton<IRescuePasswordService, RescuePasswordService>();
 builder.Services.AddSingleton<IAgentScriptProvider, AgentScriptProvider>();
 builder.Services.AddScoped<IFilaAcoesService, FilaAcoesService>();
+builder.Services.AddScoped<IBloqueioService, BloqueioService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
 
 builder.Services.AddAuthorization(options =>
@@ -153,6 +154,27 @@ app.UseAuthorization();
 app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();
+
+// Endpoint seguro para entrega de senha de resgate ao agente via token de uso único (spec 2.5)
+app.MapGet("/agente/senha-resgate", async (
+    HttpContext context,
+    IBloqueioService bloqueioService) =>
+{
+    var authHeader = context.Request.Headers.Authorization.ToString();
+    if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Unauthorized();
+    }
+
+    var token = authHeader["Bearer ".Length..].Trim();
+    var senha = await bloqueioService.ObterSenhaAgentePorTokenAsync(token);
+    if (senha == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Text(senha, "text/plain");
+});
 
 app.Run();
 

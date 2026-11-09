@@ -27,7 +27,7 @@ else
                 </h2>
                 <p class="text-muted mb-0">Hostname: <code>@(m.Hostname ?? "N/A")</code> | NodeId: <code>@(m.NodeId ?? "N/A")</code></p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 align-items-center">
                 <a asp-page="./Index" class="btn btn-outline-secondary btn-sm">Voltar</a>
                 @if (User.HasPermissao(GtViewer.Web.Security.Permissoes.SuporteRemoto) && m.ConexaoEstado == "online")
                 {
@@ -35,8 +35,66 @@ else
                         <i class="bi bi-display"></i> Acessar Tela
                     </a>
                 }
+                @if (Model.PodeBloquear && m.BloqueioEstado != "bloqueada" && m.BloqueioEstado != "bloqueio_pendente")
+                {
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalBloquear">
+                        <i class="bi bi-lock"></i> Bloquear
+                    </button>
+                }
+                @if (Model.PodeBloquear && (m.BloqueioEstado is "bloqueada" or "bloqueio_pendente" or "desbloqueio_pendente" or "falha"))
+                {
+                    <form method="post" asp-page-handler="Desbloquear" asp-route-id="@m.Id" class="d-inline" onsubmit="return confirm('Confirmar o desbloqueio desta máquina?');">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="bi bi-unlock"></i> Desbloquear
+                        </button>
+                    </form>
+                }
+                @if (Model.PodeRevelarSenha)
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalRevelarSenha" @(Model.PodeRevelarSenhaAgora ? "" : "disabled") title="@Model.MotivoIndisponivelRevelar">
+                        <i class="bi bi-key"></i> Revelar Senha
+                    </button>
+                }
             </div>
         </div>
+
+        @if (!Model.MeshCentralConectado)
+        {
+            <div class="alert alert-warning py-2 small mb-3">
+                <i class="bi bi-exclamation-triangle-fill"></i> Sem conexão com o servidor de máquinas (MeshCentral) — reinício, tela remota e revelar senha ficam indisponíveis.
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> @Model.MensagemSucesso
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.MensagemErro))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> @Model.MensagemErro
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.SenhaRevelada))
+        {
+            <div class="alert alert-warning border border-danger shadow-sm my-3 p-3">
+                <h5 class="alert-heading text-danger fw-bold"><i class="bi bi-shield-exclamation"></i> Senha de Resgate Revelada</h5>
+                <p class="mb-2">Passe esta senha para o usuário local efetuar o logon na máquina:</p>
+                <div class="input-group mb-2" style="max-width: 450px;">
+                    <input type="text" class="form-control font-monospace fw-bold fs-5 text-center bg-light" id="inputSenhaRevelada" value="@Model.SenhaRevelada" readonly />
+                    <button class="btn btn-outline-dark" type="button" onclick="navigator.clipboard.writeText(document.getElementById('inputSenhaRevelada').value); alert('Senha copiada!');">
+                        <i class="bi bi-clipboard"></i> Copiar
+                    </button>
+                </div>
+                <small class="text-danger fw-semibold d-block">
+                    <i class="bi bi-clock-history"></i> Esta senha será alterada automaticamente e a sessão da conta de resgate será encerrada assim que a máquina reconectar à internet.
+                </small>
+            </div>
+        }
 
         <div class="row g-3">
             <!-- Coluna da Esquerda: Dados de Hardware e Estados -->
@@ -217,6 +275,60 @@ else
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Modal Bloquear Máquina -->
+        <div class="modal fade" id="modalBloquear" tabindex="-1" aria-labelledby="modalBloquearLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <form method="post" asp-page-handler="Bloquear" asp-route-id="@m.Id">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning">
+                            <h5 class="modal-title" id="modalBloquearLabel"><i class="bi bi-lock-fill"></i> Bloquear Equipamento</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>O bloqueio restringirá o logon exclusivamente à conta local de resgate e desconectará o usuário ativo.</p>
+                            <div class="mb-3">
+                                <label for="motivoBloqueio" class="form-label fw-bold">Motivo do Bloqueio (obrigatório):</label>
+                                <textarea name="motivo" id="motivoBloqueio" class="form-control" rows="3" required placeholder="Ex.: Colaborador desligado da empresa / Perda do equipamento"></textarea>
+                                <div class="form-text">Esta mensagem ficará registrada na auditoria e será exibida na tela de login do Windows.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-danger"><i class="bi bi-lock"></i> Confirmar Bloqueio</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal Revelar Senha de Resgate -->
+        <div class="modal fade" id="modalRevelarSenha" tabindex="-1" aria-labelledby="modalRevelarSenhaLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <form method="post" asp-page-handler="RevelarSenha" asp-route-id="@m.Id">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="modalRevelarSenhaLabel"><i class="bi bi-shield-lock-fill"></i> Revelar Senha de Resgate</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning small mb-3">
+                                <i class="bi bi-exclamation-triangle"></i> Esta ação é estritamente auditada. Passe a senha de resgate ao usuário apenas por telefone para permitir conexão à internet.
+                            </div>
+                            <div class="mb-3">
+                                <label for="totpCode" class="form-label fw-bold">Código do Autenticador (2FA/TOTP):</label>
+                                <input type="text" name="totpCode" id="totpCode" class="form-control text-center font-monospace fs-4" maxlength="6" pattern="[0-9]{6}" required placeholder="000000" autofocus />
+                                <div class="form-text">Informe o código de 6 dígitos gerado pelo seu app autenticador.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-danger"><i class="bi bi-key-fill"></i> Confirmar e Revelar</button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
