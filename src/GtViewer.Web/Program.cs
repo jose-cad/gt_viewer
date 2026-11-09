@@ -66,6 +66,9 @@ builder.Services.Configure<LdapOptions>(
 builder.Services.Configure<MeshCentralOptions>(
     builder.Configuration.GetSection(MeshCentralOptions.SectionName));
 builder.Services.AddSingleton<MeshLoginTokenService>();
+builder.Services.AddSingleton<MeshCentralClient>();
+builder.Services.AddSingleton<IMeshCentralClient>(sp => sp.GetRequiredService<MeshCentralClient>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MeshCentralClient>());
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

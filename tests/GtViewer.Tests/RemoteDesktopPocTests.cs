@@ -131,7 +131,8 @@ public class RemoteDesktopPocTests
     public void RemoteSupportPageModel_InitializesCorrectly()
     {
         var service = new MeshLoginTokenService(FixedHexKey, "https://mesh.localhost");
-        var pageModel = new RemoteSupportModel(service)
+        var mockMesh = new GtViewer.Tests.Mocks.MockMeshCentralClient { IsConnected = true };
+        var pageModel = new RemoteSupportModel(service, mockMesh)
         {
             NodeId = "node//win11_dev",
             TechnicianUsername = "carlos"

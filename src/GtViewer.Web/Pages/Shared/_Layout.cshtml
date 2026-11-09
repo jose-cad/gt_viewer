@@ -1,3 +1,4 @@
+@inject GtViewer.Web.Services.IMeshCentralClient MeshClient
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,6 +61,13 @@
                 </div>
             </div>
         </nav>
+        @if (!MeshClient.IsConnected)
+        {
+            <div class="alert alert-warning text-center rounded-0 border-0 mb-3 py-2 shadow-sm" role="alert" id="meshcentral-offline-banner">
+                <strong><span class="badge bg-danger me-2">Offline</span> Servidor de Agentes Desconectado:</strong>
+                O MeshCentral está fora do ar ou inacessível. Ações em tempo real (como suporte remoto e reinício) estão indisponíveis.
+            </div>
+        }
     </header>
     <div class="container">
         <main role="main" class="pb-3">
