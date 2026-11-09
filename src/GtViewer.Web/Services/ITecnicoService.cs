@@ -34,15 +34,18 @@ public class TecnicoService : ITecnicoService
     private readonly GtViewerDbContext _dbContext;
     private readonly IActivationCodeService _activationCodeService;
     private readonly IAuditoriaService _auditoriaService;
+    private readonly ISuporteRemotoService? _suporteRemotoService;
 
     public TecnicoService(
         GtViewerDbContext dbContext,
         IActivationCodeService activationCodeService,
-        IAuditoriaService auditoriaService)
+        IAuditoriaService auditoriaService,
+        ISuporteRemotoService? suporteRemotoService = null)
     {
         _dbContext = dbContext;
         _activationCodeService = activationCodeService;
         _auditoriaService = auditoriaService;
+        _suporteRemotoService = suporteRemotoService;
     }
 
     public async Task<List<Tecnico>> ListarAsync(CancellationToken cancellationToken = default)
@@ -207,12 +210,19 @@ public class TecnicoService : ITecnicoService
         tecnico.Ativo = false;
         tecnico.AtualizadoEm = DateTimeOffset.UtcNow;
 
-        // Ao desativar, revogar qualquer trava de suporte remoto ativa do técnico
-        var trava = await _dbContext.TravasSessao
-            .FirstOrDefaultAsync(t => t.TecnicoUsername.ToLower() == tecnico.UsuarioDominio.ToLower(), cancellationToken);
-        if (trava != null)
+        // Ao desativar, revogar e derrubar ativamente qualquer sessão de suporte remoto ativa do técnico
+        if (_suporteRemotoService != null)
         {
-            _dbContext.TravasSessao.Remove(trava);
+            await _suporteRemotoService.EncerrarSessoesTecnicoDesativadoAsync(tecnico.UsuarioDominio, cancellationToken);
+        }
+        else
+        {
+            var trava = await _dbContext.TravasSessao
+                .FirstOrDefaultAsync(t => t.TecnicoUsername.ToLower() == tecnico.UsuarioDominio.ToLower(), cancellationToken);
+            if (trava != null)
+            {
+                _dbContext.TravasSessao.Remove(trava);
+            }
         }
 
         await _auditoriaService.RegistrarAsync(

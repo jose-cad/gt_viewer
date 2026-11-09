@@ -174,9 +174,10 @@ public class FilaAcoesService : IFilaAcoesService
 
             if (maquina == null) return;
 
-            // 1. Verificar se existe ação ativa na máquina: enviada ou resultado_desconhecido
+            // 1. Verificar se existe ação ativa na máquina: enviada ou resultado_desconhecido (excluindo suporte_remoto e reiniciar que não entram na fila)
             var acaoAtiva = maquina.Acoes
-                .FirstOrDefault(a => a.Estado == EstadosAcao.Enviada || a.Estado == EstadosAcao.ResultadoDesconhecido);
+                .FirstOrDefault(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                                     (a.Estado == EstadosAcao.Enviada || a.Estado == EstadosAcao.ResultadoDesconhecido));
 
             if (acaoAtiva != null)
             {
@@ -270,7 +271,8 @@ public class FilaAcoesService : IFilaAcoesService
 
             // 2. Não há ação ativa na máquina -> Buscar próxima ação pendente por prioridade e criação
             var proximaAcao = maquina.Acoes
-                .Where(a => a.Estado == EstadosAcao.Pendente)
+                .Where(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                            a.Estado == EstadosAcao.Pendente)
                 .OrderBy(a => a.Prioridade)
                 .ThenBy(a => a.CriadoEm)
                 .FirstOrDefault();
@@ -354,7 +356,8 @@ public class FilaAcoesService : IFilaAcoesService
         maquina.ConexaoEstado = "offline";
 
         var enviadas = maquina.Acoes
-            .Where(a => a.Estado == EstadosAcao.Enviada)
+            .Where(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                        a.Estado == EstadosAcao.Enviada)
             .ToList();
 
         if (enviadas.Count > 0)
@@ -377,7 +380,8 @@ public class FilaAcoesService : IFilaAcoesService
 
         var acoesOrfas = await _dbContext.Acoes
             .Include(a => a.Maquina)
-            .Where(a => a.Estado == EstadosAcao.Enviada)
+            .Where(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                        a.Estado == EstadosAcao.Enviada)
             .ToListAsync(cancellationToken);
 
         if (acoesOrfas.Count > 0)
@@ -413,10 +417,11 @@ public class FilaAcoesService : IFilaAcoesService
     {
         var agora = DateTimeOffset.UtcNow;
 
-        // 1. Identificar timeouts de ações enviadas
+        // 1. Identificar timeouts de ações enviadas (excluindo suporte_remoto e reiniciar da fila)
         var enviadas = await _dbContext.Acoes
             .Include(a => a.Maquina)
-            .Where(a => a.Estado == EstadosAcao.Enviada)
+            .Where(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                        a.Estado == EstadosAcao.Enviada)
             .ToListAsync(cancellationToken);
 
         foreach (var acao in enviadas)
@@ -439,7 +444,8 @@ public class FilaAcoesService : IFilaAcoesService
 
         // 2. Buscar máquinas que possuem ações pendentes ou em resultado_desconhecido
         var maquinasIds = await _dbContext.Maquinas
-            .Where(m => m.Acoes.Any(a => a.Estado == EstadosAcao.Pendente || a.Estado == EstadosAcao.ResultadoDesconhecido))
+            .Where(m => m.Acoes.Any(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                                         (a.Estado == EstadosAcao.Pendente || a.Estado == EstadosAcao.ResultadoDesconhecido)))
             .Select(m => m.Id)
             .ToListAsync(cancellationToken);
 
@@ -460,7 +466,8 @@ public class FilaAcoesService : IFilaAcoesService
         CancellationToken cancellationToken = default)
     {
         var maquinasComDesconhecido = await _dbContext.Maquinas
-            .Where(m => m.Acoes.Any(a => a.Estado == EstadosAcao.ResultadoDesconhecido))
+            .Where(m => m.Acoes.Any(a => a.Tipo != TiposAcao.SuporteRemoto && a.Tipo != TiposAcao.Reiniciar &&
+                                         a.Estado == EstadosAcao.ResultadoDesconhecido))
             .ToListAsync(cancellationToken);
 
         foreach (var maquina in maquinasComDesconhecido)
