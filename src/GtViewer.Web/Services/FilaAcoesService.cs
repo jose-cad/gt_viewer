@@ -222,6 +222,52 @@ public class FilaAcoesService : IFilaAcoesService
                 }
             }
 
+            // Se a máquina estiver online e a senha de resgate tiver sido revelada,
+            // garante que haja uma troca de senha de resgate (P1) antes de qualquer outra ação (spec J6)
+            if (IsMaquinaOnline(maquina) && maquina.SenhaResgateRevelada)
+            {
+                var temAcaoResgateAtivaOuPendente = maquina.Acoes.Any(a =>
+                    (a.Tipo is TiposAcao.TrocarResgate or TiposAcao.RedefinirResgate or TiposAcao.GarantirResgate) &&
+                    (a.Estado is EstadosAcao.Pendente or EstadosAcao.Enviada or EstadosAcao.ResultadoDesconhecido));
+
+                if (!temAcaoResgateAtivaOuPendente)
+                {
+                    if (string.IsNullOrEmpty(maquina.SenhaResgateCandidataCifrada))
+                    {
+                        var novaSenha = _rescuePasswordService.GeneratePassword();
+                        maquina.SenhaResgateCandidataCifrada = _rescuePasswordService.EncryptPassword(novaSenha);
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
+
+                    var acaoTroca = new Acao
+                    {
+                        MaquinaId = maquina.Id,
+                        Tipo = TiposAcao.TrocarResgate,
+                        Prioridade = PrioridadesAcao.Resgate,
+                        Estado = EstadosAcao.Pendente,
+                        Ator = "sistema",
+                        ParametrosJson = JsonSerializer.Serialize(new { motivo = "Troca obrigatória após revelação da senha de resgate" }),
+                        CriadoEm = DateTimeOffset.UtcNow
+                    };
+                    _dbContext.Acoes.Add(acaoTroca);
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+                    var auditTroca = new Auditoria
+                    {
+                        DataHora = DateTimeOffset.UtcNow,
+                        Ator = "sistema",
+                        Tipo = TiposAuditoria.TrocarSenhaResgate,
+                        Alvo = maquina.NumeroSerie,
+                        MaquinaId = maquina.Id,
+                        AcaoId = acaoTroca.Id,
+                        Sucesso = true,
+                        DetalhesJson = acaoTroca.ParametrosJson
+                    };
+                    _dbContext.Auditorias.Add(auditTroca);
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                }
+            }
+
             // 2. Não há ação ativa na máquina -> Buscar próxima ação pendente por prioridade e criação
             var proximaAcao = maquina.Acoes
                 .Where(a => a.Estado == EstadosAcao.Pendente)
@@ -616,11 +662,7 @@ public class FilaAcoesService : IFilaAcoesService
                 acao.Estado = EstadosAcao.Falhou;
                 acao.ConcluidoEm = DateTimeOffset.UtcNow;
 
-                if (acao.Tipo == TiposAcao.Bloquear && maquina != null)
-                {
-                    maquina.BloqueioEstado = "falha";
-                }
-
+                await TratarFalhaAcaoAsync(acao, maquina, cancellationToken);
                 await RegistrarAuditoriaTransicaoAsync(acao, maquina, false, cancellationToken);
             }
             else
@@ -667,6 +709,7 @@ public class FilaAcoesService : IFilaAcoesService
                     {
                         acao.Estado = EstadosAcao.Falhou;
                         acao.ConcluidoEm = DateTimeOffset.UtcNow;
+                        await TratarFalhaAcaoAsync(acao, maquina, cancellationToken);
                         await RegistrarAuditoriaTransicaoAsync(acao, maquina, false, cancellationToken);
                     }
                 }
@@ -678,6 +721,7 @@ public class FilaAcoesService : IFilaAcoesService
                 {
                     acao.Estado = EstadosAcao.Falhou;
                     acao.ConcluidoEm = DateTimeOffset.UtcNow;
+                    await TratarFalhaAcaoAsync(acao, maquina, cancellationToken);
                     await RegistrarAuditoriaTransicaoAsync(acao, maquina, false, cancellationToken);
                 }
             }
@@ -877,7 +921,53 @@ public class FilaAcoesService : IFilaAcoesService
                 maquina.SenhaResgateAtualCifrada = maquina.SenhaResgateCandidataCifrada;
                 maquina.SenhaResgateCandidataCifrada = null;
             }
+            maquina.SenhaResgateRevelada = false;
             maquina.AtualizadoEm = DateTimeOffset.UtcNow;
+        }
+    }
+
+    private async Task TratarFalhaAcaoAsync(Acao acao, Maquina? maquina, CancellationToken cancellationToken)
+    {
+        if (maquina == null) return;
+
+        if (acao.Tipo == TiposAcao.Bloquear)
+        {
+            maquina.BloqueioEstado = "falha";
+        }
+        else if (acao.Tipo == TiposAcao.TrocarResgate)
+        {
+            _logger.LogWarning("[FilaAcoes] Troca de senha da máquina {Serie} falhou após 3 tentativas. Disparando redefinir conta de resgate.", maquina.NumeroSerie);
+            maquina.SenhaResgateCandidataCifrada = null;
+            var novaSenha = _rescuePasswordService.GeneratePassword();
+            maquina.SenhaResgateCandidataCifrada = _rescuePasswordService.EncryptPassword(novaSenha);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            var acaoRedefinir = new Acao
+            {
+                MaquinaId = maquina.Id,
+                Tipo = TiposAcao.RedefinirResgate,
+                Prioridade = PrioridadesAcao.Resgate,
+                Estado = EstadosAcao.Pendente,
+                Ator = "sistema",
+                ParametrosJson = JsonSerializer.Serialize(new { motivo = "Disparo automático após falha em trocar senha de resgate" }),
+                CriadoEm = DateTimeOffset.UtcNow
+            };
+            _dbContext.Acoes.Add(acaoRedefinir);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            var auditRedefinir = new Auditoria
+            {
+                DataHora = DateTimeOffset.UtcNow,
+                Ator = "sistema",
+                Tipo = TiposAuditoria.RedefinirContaResgate,
+                Alvo = maquina.NumeroSerie,
+                MaquinaId = maquina.Id,
+                AcaoId = acaoRedefinir.Id,
+                Sucesso = true,
+                DetalhesJson = acaoRedefinir.ParametrosJson
+            };
+            _dbContext.Auditorias.Add(auditRedefinir);
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -925,6 +1015,22 @@ public class FilaAcoesService : IFilaAcoesService
             case TiposAcao.Bloquear:
             {
                 var scriptBase = await _scriptProvider.ObterScriptAsync("BloquearMaquina.ps1", cancellationToken);
+                if (!string.IsNullOrWhiteSpace(acao.ParametrosJson))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(acao.ParametrosJson);
+                        if (doc.RootElement.TryGetProperty("motivo", out var motivoElem) && !string.IsNullOrWhiteSpace(motivoElem.GetString()))
+                        {
+                            var motivo = motivoElem.GetString()!.Replace("'", "''");
+                            return $"$ContactMessage = '{motivo}';\n" + scriptBase;
+                        }
+                    }
+                    catch
+                    {
+                        // Se não for JSON válido de motivo, prossegue com script padrão
+                    }
+                }
                 return scriptBase;
             }
 
