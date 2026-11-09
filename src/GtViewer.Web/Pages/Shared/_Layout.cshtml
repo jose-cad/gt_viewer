@@ -24,6 +24,18 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Maquinas/Index">Inventário (J3)</a>
+                            </li>
+                        }
+                        @if (User.HasPermissao(Permissoes.CadastrarMaquinas))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Maquinas/Aprovacao">Aprovações (J2)</a>
+                            </li>
+                        }
                         @if (User.HasPermissao(Permissoes.SuporteRemoto))
                         {
                             <li class="nav-item">

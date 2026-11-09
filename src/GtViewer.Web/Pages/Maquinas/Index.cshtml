@@ -1,0 +1,232 @@
+@page
+@model GtViewer.Web.Pages.Maquinas.IndexModel
+@{
+    ViewData["Title"] = "Inventário de Máquinas (J3)";
+}
+
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2><i class="bi bi-laptop"></i> Inventário de Máquinas</h2>
+            <p class="text-muted mb-0">Visão unificada das máquinas gerenciadas via MeshCentral</p>
+        </div>
+        <div class="d-flex gap-2">
+            @if (User.HasPermissao(GtViewer.Web.Security.Permissoes.CadastrarMaquinas))
+            {
+                <a asp-page="./DownloadInstalador" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-download"></i> Baixar Instalador do Agente
+                </a>
+                <a asp-page="./Aprovacao" class="btn btn-warning btn-sm position-relative">
+                    <i class="bi bi-shield-exclamation"></i> Conflitos & Aprovações
+                    @if (Model.TotalEmAprovacao > 0)
+                    {
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            @Model.TotalEmAprovacao
+                        </span>
+                    }
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- Cards de Resumo -->
+    <div class="row g-2 mb-3">
+        <div class="col-sm-6 col-md-3">
+            <div class="card border-primary shadow-sm text-center py-2">
+                <div class="text-muted small">Total de Máquinas</div>
+                <div class="fs-4 fw-bold text-primary">@Model.TotalMaquinas</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card border-success shadow-sm text-center py-2">
+                <div class="text-muted small">Online Agora</div>
+                <div class="fs-4 fw-bold text-success">@Model.TotalOnline</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card border-danger shadow-sm text-center py-2">
+                <div class="text-muted small">Bloqueadas</div>
+                <div class="fs-4 fw-bold text-danger">@Model.TotalBloqueadas</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card border-warning shadow-sm text-center py-2">
+                <div class="text-muted small">Aguardando Aprovação</div>
+                <div class="fs-4 fw-bold text-warning">@Model.TotalEmAprovacao</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros e Busca -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-center">
+                <div class="col-md-3">
+                    <input type="text" name="Busca" value="@Model.Busca" class="form-control form-control-sm" placeholder="Buscar por série, host ou usuário..." />
+                </div>
+                <div class="col-md-2">
+                    <select name="Conexao" class="form-select form-select-sm">
+                        <option value="">Conexão (Todas)</option>
+                        <option value="online" selected="@(Model.Conexao == "online")">Online</option>
+                        <option value="offline" selected="@(Model.Conexao == "offline")">Offline</option>
+                        <option value="sumida" selected="@(Model.Conexao == "sumida")">Sumida (>30d)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="Bloqueio" class="form-select form-select-sm">
+                        <option value="">Bloqueio (Todos)</option>
+                        <option value="desbloqueada" selected="@(Model.Bloqueio == "desbloqueada")">Desbloqueada</option>
+                        <option value="bloqueada" selected="@(Model.Bloqueio == "bloqueada")">Bloqueada</option>
+                        <option value="bloqueio_pendente" selected="@(Model.Bloqueio == "bloqueio_pendente")">Bloqueio Pendente</option>
+                        <option value="desbloqueio_pendente" selected="@(Model.Bloqueio == "desbloqueio_pendente")">Desbloqueio Pendente</option>
+                        <option value="falha" selected="@(Model.Bloqueio == "falha")">Falha</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="Contrato" class="form-select form-select-sm">
+                        <option value="">Contrato (Todos)</option>
+                        <option value="no_contrato" selected="@(Model.Contrato == "no_contrato")">No Contrato</option>
+                        <option value="fora_do_contrato" selected="@(Model.Contrato == "fora_do_contrato")">Fora do Contrato</option>
+                        <option value="sem_planilha" selected="@(Model.Contrato == "sem_planilha")">Sem Planilha</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filtrar</button>
+                    <a asp-page="./Index" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela de Máquinas -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Status</th>
+                        <th>Número de Série</th>
+                        <th>Hostname</th>
+                        <th>Modelo / Fabricante</th>
+                        <th>SO</th>
+                        <th>Usuários Logados</th>
+                        <th>Antivírus</th>
+                        <th>Contrato</th>
+                        <th>Último Contato</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Maquinas.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                Nenhuma máquina encontrada com os filtros informados.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var m in Model.Maquinas)
+                        {
+                            <tr>
+                                <td>
+                                    @if (m.EmAprovacao)
+                                    {
+                                        <span class="badge bg-warning text-dark">Em Aprovação</span>
+                                    }
+                                    else if (m.ConexaoEstado == "online")
+                                    {
+                                        <span class="badge bg-success">Online</span>
+                                    }
+                                    else if (m.ConexaoEstado == "sumida")
+                                    {
+                                        <span class="badge bg-danger">Sumida</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Offline</span>
+                                    }
+
+                                    @if (m.BloqueioEstado == "bloqueada")
+                                    {
+                                        <span class="badge bg-danger ms-1">Bloqueada</span>
+                                    }
+                                </td>
+                                <td>
+                                    <strong>@m.NumeroSerie</strong>
+                                    @if (m.SerieManual)
+                                    {
+                                        <span class="badge bg-info text-dark ms-1" title="Série corrigida manualmente">Manual</span>
+                                    }
+                                </td>
+                                <td>@(m.Hostname ?? "-")</td>
+                                <td>
+                                    <div>@(m.Modelo ?? "-")</div>
+                                    <small class="text-muted">@(m.Fabricante ?? "")</small>
+                                </td>
+                                <td><small>@(m.SistemaOperacional ?? "-")</small></td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(m.UsuariosLogados))
+                                    {
+                                        <span class="badge bg-light text-dark border">@m.UsuariosLogados</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (m.AntivirusStatus == "Ativo e Atualizado")
+                                    {
+                                        <span class="badge bg-success">OK</span>
+                                    }
+                                    else if (m.AntivirusStatus == "Com Problema")
+                                    {
+                                        <span class="badge bg-warning text-dark">Alerta</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark border">Desconhecido</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (m.SituacaoContrato == "no_contrato")
+                                    {
+                                        <span class="badge bg-success">No Contrato</span>
+                                    }
+                                    else if (m.SituacaoContrato == "fora_do_contrato")
+                                    {
+                                        <span class="badge bg-danger">Fora do Contrato</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Sem Planilha</span>
+                                    }
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        @(m.UltimoContatoEm.HasValue ? m.UltimoContatoEm.Value.ToString("dd/MM/yyyy HH:mm") : "-")
+                                    </small>
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a asp-page="./Detalhes" asp-route-id="@m.Id" class="btn btn-outline-secondary">
+                                            Detalhes
+                                        </a>
+                                        @if (User.HasPermissao(GtViewer.Web.Security.Permissoes.SuporteRemoto) && m.ConexaoEstado == "online")
+                                        {
+                                            <a asp-page="/RemoteSupport" asp-route-nodeId="@m.NodeId" class="btn btn-outline-primary">
+                                                Tela
+                                            </a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

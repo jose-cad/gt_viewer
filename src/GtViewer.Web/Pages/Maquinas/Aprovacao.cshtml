@@ -1,0 +1,163 @@
+@page
+@model GtViewer.Web.Pages.Maquinas.AprovacaoModel
+@{
+    ViewData["Title"] = "Conflitos & Aprovações de Agente (J2)";
+}
+
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2><i class="bi bi-shield-exclamation text-warning"></i> Aprovação de Conflitos e Correção de Séries (J2)</h2>
+            <p class="text-muted mb-0">Gerencie máquinas em conflito de série após reinstalações e atribua números de série manuais.</p>
+        </div>
+        <a asp-page="./Index" class="btn btn-outline-secondary btn-sm">Voltar ao Inventário</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @Model.MensagemSucesso
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i> @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Seção 1: Agentes Conflitantes Aguardando Aprovação -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-warning bg-opacity-10 fw-bold">
+            <i class="bi bi-person-check"></i> Máquinas com Conflito de Agente (Aguardando Aprovação)
+        </div>
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Série</th>
+                        <th>Agente Antigo (Registrado)</th>
+                        <th>Agente Novo (Candidato)</th>
+                        <th>Estado Atual</th>
+                        <th class="text-end">Ações de Decisão</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.MaquinasAprovacao.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                Nenhuma máquina com conflito ou aguardando aprovação no momento.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var m in Model.MaquinasAprovacao)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@m.NumeroSerie</strong>
+                                    <div><small class="text-muted">ID: #@m.Id</small></div>
+                                </td>
+                                <td>
+                                    <div><strong>Host:</strong> @(m.Hostname ?? "-")</div>
+                                    <div><small class="text-muted">NodeId: <code>@m.NodeId</code></small></div>
+                                    <div><span class="badge @(m.ConexaoEstado == "online" ? "bg-success" : "bg-secondary")">@m.ConexaoEstado</span></div>
+                                </td>
+                                <td>
+                                    <div class="text-primary"><strong>Novo Agente Detectado</strong></div>
+                                    <div><small class="text-muted">Aguardando decisão da TI</small></div>
+                                    <span class="badge bg-warning text-dark">Pendente Aprovação</span>
+                                </td>
+                                <td>
+                                    <div>Bloqueio: <span class="badge bg-secondary">@m.BloqueioEstado</span></div>
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-2">
+                                        <!-- Formulário de Aprovação -->
+                                        <form method="post" asp-page-handler="Aprovar" class="d-inline">
+                                            <input type="hidden" name="maquinaId" value="@m.Id" />
+                                            @if (User.HasPermissao(GtViewer.Web.Security.Permissoes.Bloquear))
+                                            {
+                                                <input type="hidden" name="manterBloqueio" value="false" />
+                                                <input type="hidden" name="justificativa" value="Limpeza de bloqueio padrão na aprovação de novo agente." />
+                                            }
+                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Aprovar a troca do agente antigo pelo novo? O agente antigo será desvinculado.')">
+                                                <i class="bi bi-check-lg"></i> Aprovar Troca
+                                            </button>
+                                        </form>
+
+                                        <!-- Formulário de Rejeição -->
+                                        <form method="post" asp-page-handler="Rejeitar" class="d-inline">
+                                            <input type="hidden" name="maquinaId" value="@m.Id" />
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Rejeitar o novo agente candidato?')">
+                                                <i class="bi bi-x-lg"></i> Rejeitar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Seção 2: Máquinas Sem Série (Correção Manual) -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-info bg-opacity-10 fw-bold">
+            <i class="bi bi-pencil-square"></i> Máquinas com Série Genérica ou Ausente ("Sem Série")
+        </div>
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Identificador Provisório</th>
+                        <th>Hostname</th>
+                        <th>Modelo / Fabricante</th>
+                        <th>SO</th>
+                        <th style="min-width: 320px;">Corrigir Número de Série Manualmente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.MaquinasSemSerie.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                Nenhuma máquina sem número de série identificada.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var semSerie in Model.MaquinasSemSerie)
+                        {
+                            <tr>
+                                <td>
+                                    <code>@semSerie.NumeroSerie</code>
+                                </td>
+                                <td>@(semSerie.Hostname ?? "-")</td>
+                                <td>@(semSerie.Modelo ?? "-") (@(semSerie.Fabricante ?? "-"))</td>
+                                <td><small>@(semSerie.SistemaOperacional ?? "-")</small></td>
+                                <td>
+                                    <form method="post" asp-page-handler="CorrigirSerie" class="d-flex gap-2">
+                                        <input type="hidden" name="maquinaId" value="@semSerie.Id" />
+                                        <input type="text" name="novaSerie" class="form-control form-control-sm" placeholder="Ex.: BRG1234567" required />
+                                        <button type="submit" class="btn btn-primary btn-sm text-nowrap">
+                                            Salvar Série
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
