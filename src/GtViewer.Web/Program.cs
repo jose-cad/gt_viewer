@@ -60,6 +60,7 @@ builder.Services.AddScoped<IInventarioService, InventarioService>();
 builder.Services.AddSingleton<IAuthenticodeValidator, AuthenticodeValidator>();
 builder.Services.AddScoped<ICatalogoService, CatalogoService>();
 builder.Services.AddScoped<IPlanilhaLocadoraService, PlanilhaLocadoraService>();
+builder.Services.AddScoped<IRetentionService, RetentionService>();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -82,6 +83,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<MeshCentralClient>
 builder.Services.AddHostedService<InventarioBackgroundService>();
 builder.Services.AddHostedService<FilaAcoesBackgroundService>();
 builder.Services.AddHostedService<SuporteRemotoWorker>();
+builder.Services.AddHostedService<AuditoriaRetentionWorker>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
