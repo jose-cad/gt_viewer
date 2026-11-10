@@ -59,6 +59,7 @@ builder.Services.AddScoped<ISuporteRemotoService, SuporteRemotoService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
 builder.Services.AddSingleton<IAuthenticodeValidator, AuthenticodeValidator>();
 builder.Services.AddScoped<ICatalogoService, CatalogoService>();
+builder.Services.AddScoped<IPlanilhaLocadoraService, PlanilhaLocadoraService>();
 
 builder.Services.AddAuthorization(options =>
 {

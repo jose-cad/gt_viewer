@@ -36,6 +36,12 @@
                                 <a class="nav-link text-dark" asp-area="" asp-page="/Tarefas/Index">Tarefas</a>
                             </li>
                         }
+                        @if (User.HasPermissao(Permissoes.ImportarPlanilha))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Contrato/Index">Contrato (J4)</a>
+                            </li>
+                        }
                         @if (User.HasPermissao(Permissoes.CadastrarMaquinas))
                         {
                             <li class="nav-item">
