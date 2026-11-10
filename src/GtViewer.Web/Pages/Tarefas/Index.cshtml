@@ -1,0 +1,96 @@
+@page
+@model GtViewer.Web.Pages.Tarefas.IndexModel
+@{
+    ViewData["Title"] = "Tarefas de Distribuição (J8)";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Tarefas de Distribuição</h2>
+            <small class="text-muted">Acompanhe o status e progresso de instalações e remoções em lote.</small>
+        </div>
+        <div>
+            <a class="btn btn-primary" asp-page="/Catalogo/Instalar">
+                <i class="bi bi-plus-lg"></i> Nova Distribuição
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Tipo</th>
+                            <th>Aplicativo</th>
+                            <th>Alvo</th>
+                            <th>Solicitante</th>
+                            <th>Criado Em</th>
+                            <th>Progresso</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Tarefas.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center py-4 text-muted">
+                                    Nenhuma tarefa registrada no momento.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var t in Model.Tarefas)
+                        {
+                            <tr>
+                                <td class="fw-bold">#@t.Id</td>
+                                <td>
+                                    <span class="badge @(t.Tipo == "instalar" ? "bg-primary" : "bg-warning text-dark")">@t.Tipo</span>
+                                </td>
+                                <td><strong>@t.AppNome</strong> <small class="text-muted">(@t.AppVersao)</small></td>
+                                <td>@(t.GrupoNome != null ? $"Grupo: {t.GrupoNome}" : $"{t.TotalAcoes} máquina(s)")</td>
+                                <td><small class="badge bg-light text-dark border">@t.Ator</small></td>
+                                <td><small>@t.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small></td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2" style="min-width: 150px;">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            @{
+                                                var percSucesso = t.TotalAcoes > 0 ? (t.Sucesso * 100) / t.TotalAcoes : 0;
+                                                var percFalha = t.TotalAcoes > 0 ? (t.Falhas * 100) / t.TotalAcoes : 0;
+                                            }
+                                            <div class="progress-bar bg-success" style="width: @percSucesso%"></div>
+                                            <div class="progress-bar bg-danger" style="width: @percFalha%"></div>
+                                        </div>
+                                        <small class="text-muted">@t.Sucesso/@t.TotalAcoes</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (t.ConcluidoEm.HasValue)
+                                    {
+                                        <span class="badge bg-success">Concluída</span>
+                                    }
+                                    else if (t.Pendentes > 0)
+                                    {
+                                        <span class="badge bg-info text-dark">Em Andamento</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Finalizada</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-outline-primary btn-sm" asp-page="/Tarefas/Detalhes" asp-route-id="@t.Id">
+                                        Ver Detalhes
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

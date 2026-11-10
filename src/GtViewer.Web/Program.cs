@@ -57,6 +57,8 @@ builder.Services.AddScoped<IBloqueioService, BloqueioService>();
 builder.Services.AddScoped<IReiniciarService, ReiniciarService>();
 builder.Services.AddScoped<ISuporteRemotoService, SuporteRemotoService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
+builder.Services.AddSingleton<IAuthenticodeValidator, AuthenticodeValidator>();
+builder.Services.AddScoped<ICatalogoService, CatalogoService>();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -161,11 +163,19 @@ app.MapRazorPages()
 // Endpoint seguro para entrega de senha de resgate ao agente via token de uso único (spec 2.5)
 app.MapGet("/agente/senha-resgate", async (
     HttpContext context,
-    IBloqueioService bloqueioService) =>
+    IBloqueioService bloqueioService,
+    ILoginSecurityService securityService) =>
 {
+    var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (securityService.IsIpBlocked(clientIp))
+    {
+        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+    }
+
     var authHeader = context.Request.Headers.Authorization.ToString();
     if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
     {
+        securityService.RecordFailedAttempt(null, clientIp);
         return Results.Unauthorized();
     }
 
@@ -173,10 +183,72 @@ app.MapGet("/agente/senha-resgate", async (
     var senha = await bloqueioService.ObterSenhaAgentePorTokenAsync(token);
     if (senha == null)
     {
+        securityService.RecordFailedAttempt(null, clientIp);
         return Results.Unauthorized();
     }
 
     return Results.Text(senha, "text/plain");
+});
+
+// Endpoints seguros para download de instaladores do catálogo via token de 30 min com suporte a retomada (Range)
+app.MapGet("/agente/download/{token}", async (
+    string token,
+    HttpContext context,
+    ICatalogoService catalogoService,
+    ILoginSecurityService securityService) =>
+{
+    var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (securityService.IsIpBlocked(clientIp))
+    {
+        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+    }
+
+    var result = await catalogoService.ObterInstaladorPorTokenAsync(token);
+    if (result == null)
+    {
+        // Rate limit de /agente/* só conta tokens inválidos (spec 2.7 / Tarefa 14)
+        securityService.RecordFailedAttempt(null, clientIp);
+        return Results.Unauthorized();
+    }
+
+    return Results.Stream(
+        result.Stream,
+        contentType: result.ContentType,
+        fileDownloadName: result.FileName,
+        enableRangeProcessing: true);
+});
+
+app.MapGet("/agente/instalador", async (
+    HttpContext context,
+    ICatalogoService catalogoService,
+    ILoginSecurityService securityService) =>
+{
+    var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (securityService.IsIpBlocked(clientIp))
+    {
+        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+    }
+
+    var authHeader = context.Request.Headers.Authorization.ToString();
+    if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        securityService.RecordFailedAttempt(null, clientIp);
+        return Results.Unauthorized();
+    }
+
+    var token = authHeader["Bearer ".Length..].Trim();
+    var result = await catalogoService.ObterInstaladorPorTokenAsync(token);
+    if (result == null)
+    {
+        securityService.RecordFailedAttempt(null, clientIp);
+        return Results.Unauthorized();
+    }
+
+    return Results.Stream(
+        result.Stream,
+        contentType: result.ContentType,
+        fileDownloadName: result.FileName,
+        enableRangeProcessing: true);
 });
 
 app.Run();
