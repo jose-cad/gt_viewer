@@ -1,0 +1,110 @@
+@page "{id:int}"
+@model GtViewer.Web.Pages.Catalogo.EditarModel
+@{
+    ViewData["Title"] = "Editar Aplicativo - Catálogo";
+}
+
+<div class="container py-3" style="max-width: 800px;">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h2 class="mb-0">Editar Aplicativo</h2>
+            <small class="text-muted">Atualize metadados, regra de detecção ou substitua o instalador.</small>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" asp-page="/Catalogo/Index">Voltar</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <form method="post" enctype="multipart/form-data">
+                <input type="hidden" asp-for="Id" />
+
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label asp-for="Nome" class="form-label fw-bold">Nome do Aplicativo</label>
+                        <input asp-for="Nome" class="form-control" />
+                        <span asp-validation-for="Nome" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="Versao" class="form-label fw-bold">Versão</label>
+                        <input asp-for="Versao" class="form-control" />
+                        <span asp-validation-for="Versao" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-12">
+                        <label asp-for="FabricanteEsperado" class="form-label fw-bold">Fabricante Esperado no Certificado Digital</label>
+                        <input asp-for="FabricanteEsperado" class="form-control" />
+                        <span asp-validation-for="FabricanteEsperado" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="p-3 bg-light rounded border">
+                            <div class="fw-bold mb-1">Instalador Atual no Servidor:</div>
+                            <small class="text-muted d-block">Tamanho: @((Model.TamanhoBytesAtual / (1024.0 * 1024.0)).ToString("F2")) MB</small>
+                            <small class="text-muted d-block font-monospace">Hash SHA-256: @Model.HashSha256Atual</small>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label asp-for="NovoArquivo" class="form-label fw-bold">Substituir Instalador (Opcional, até 500 MB)</label>
+                        <input asp-for="NovoArquivo" class="form-control" type="file" accept=".msi,.exe" />
+                        <small class="text-muted">Deixe em branco para manter o arquivo atual.</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="ParametrosInstalacao" class="form-label fw-bold">Parâmetros de Instalação Silenciosa</label>
+                        <input asp-for="ParametrosInstalacao" class="form-control font-monospace" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="ComandoRemocao" class="form-label fw-bold">Comando de Remoção Silenciosa</label>
+                        <input asp-for="ComandoRemocao" class="form-control font-monospace" />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h5 class="border-bottom pb-2">Regra de Detecção de Presença</h5>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="RegraDeteccaoTipo" class="form-label fw-bold">Tipo de Detecção</label>
+                        <select asp-for="RegraDeteccaoTipo" class="form-select">
+                            <option value="registro">Registro do Windows</option>
+                            <option value="arquivo">Arquivo em Disco</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-8">
+                        <label asp-for="RegraDeteccaoChave" class="form-label fw-bold">Chave de Registro ou Caminho do Arquivo</label>
+                        <input asp-for="RegraDeteccaoChave" class="form-control font-monospace" />
+                        <span asp-validation-for="RegraDeteccaoChave" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-12">
+                        <label asp-for="RegraDeteccaoValor" class="form-label fw-bold">Valor / Versão Esperada (Opcional)</label>
+                        <input asp-for="RegraDeteccaoValor" class="form-control" />
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch mt-2">
+                            <input asp-for="Ativo" class="form-check-input" type="checkbox" id="switchAtivo" />
+                            <label class="form-check-label fw-bold" for="switchAtivo">Aplicativo Ativo no Catálogo</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 text-end mt-4">
+                        <a class="btn btn-outline-secondary me-2" asp-page="/Catalogo/Index">Cancelar</a>
+                        <button type="submit" class="btn btn-primary px-4">Salvar Alterações</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

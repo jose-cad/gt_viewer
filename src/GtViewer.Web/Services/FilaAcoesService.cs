@@ -548,6 +548,68 @@ public class FilaAcoesService : IFilaAcoesService
         return tarefa;
     }
 
+    public async Task<Tarefa> CriarTarefaMaquinasAsync(
+        IEnumerable<int> maquinasIds,
+        string tipo,
+        string ator,
+        int? appCatalogoId = null,
+        string? parametrosJson = null,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = maquinasIds.Distinct().ToList();
+        var maquinas = await _dbContext.Maquinas
+            .Where(m => ids.Contains(m.Id) && !m.EmAprovacao)
+            .ToListAsync(cancellationToken);
+
+        await using var tx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var tarefa = new Tarefa
+        {
+            Tipo = tipo,
+            Ator = string.IsNullOrWhiteSpace(ator) ? "sistema" : ator,
+            AppCatalogoId = appCatalogoId,
+            CriadoEm = DateTimeOffset.UtcNow
+        };
+
+        _dbContext.Tarefas.Add(tarefa);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var m in maquinas)
+        {
+            var acao = new Acao
+            {
+                MaquinaId = m.Id,
+                TarefaId = tarefa.Id,
+                Tipo = tipo,
+                Prioridade = PrioridadesAcao.Aplicativos,
+                Estado = EstadosAcao.Pendente,
+                Ator = tarefa.Ator,
+                ParametrosJson = parametrosJson,
+                CriadoEm = DateTimeOffset.UtcNow
+            };
+            _dbContext.Acoes.Add(acao);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var auditoria = new Auditoria
+        {
+            DataHora = DateTimeOffset.UtcNow,
+            Ator = tarefa.Ator,
+            Tipo = tipo == TiposAcao.Instalar ? TiposAuditoria.Instalar : TiposAuditoria.Remover,
+            Alvo = $"{maquinas.Count} máquinas",
+            Sucesso = true,
+            DetalhesJson = JsonSerializer.Serialize(new { tarefa.Id, TotalMaquinas = maquinas.Count, MaquinasIds = maquinas.Select(m => m.Id) })
+        };
+
+        _dbContext.Auditorias.Add(auditoria);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        _logger.LogInformation("[FilaAcoes] Tarefa {TarefaId} criada para {Count} máquinas com tipo {Tipo}.", tarefa.Id, maquinas.Count, tipo);
+        return tarefa;
+    }
+
     private async Task DespacharAcaoAsync(int acaoId, CancellationToken cancellationToken)
     {
         var acao = await _dbContext.Acoes
@@ -1049,12 +1111,81 @@ public class FilaAcoesService : IFilaAcoesService
 
             case TiposAcao.Instalar:
             {
-                return await _scriptProvider.ObterScriptAsync("InstalarApp.ps1", cancellationToken);
+                var scriptBase = await _scriptProvider.ObterScriptAsync("InstalarApp.ps1", cancellationToken);
+
+                int? appCatalogoId = acao.Tarefa?.AppCatalogoId;
+                if (appCatalogoId == null && !string.IsNullOrWhiteSpace(acao.ParametrosJson))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(acao.ParametrosJson);
+                        if (doc.RootElement.TryGetProperty("appCatalogoId", out var idElem))
+                        {
+                            appCatalogoId = idElem.GetInt32();
+                        }
+                    }
+                    catch { /* ignore */ }
+                }
+
+                AppCatalogo? app = null;
+                if (appCatalogoId.HasValue)
+                {
+                    app = await _dbContext.AppsCatalogo.AsNoTracking().FirstOrDefaultAsync(a => a.Id == appCatalogoId.Value, cancellationToken);
+                }
+
+                var token = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+                acao.TokenAgenteHash = ComputeSha256(token);
+                acao.TokenAgenteExpiraEm = DateTimeOffset.UtcNow.AddMinutes(30);
+                acao.TokenAgenteUsado = false;
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                var serverUrl = _options.ServerUrl ?? "https://localhost";
+                var downloadUrl = $"{serverUrl.TrimEnd('/')}/agente/download/{token}";
+
+                var header = $"$ServerUrl = '{EscapePsString(serverUrl)}';\n" +
+                             $"$DownloadToken = '{EscapePsString(token)}';\n" +
+                             $"$DownloadUrl = '{EscapePsString(downloadUrl)}';\n" +
+                             $"$ExpectedHash = '{EscapePsString(app?.HashSha256 ?? string.Empty).ToUpperInvariant()}';\n" +
+                             $"$ExpectedPublisher = '{EscapePsString(app?.FabricanteEsperado ?? string.Empty)}';\n" +
+                             $"$FileName = '{EscapePsString(app?.NomeArquivo ?? "installer.msi")}';\n" +
+                             $"$InstallArgs = '{EscapePsString(app?.ParametrosInstalacao ?? string.Empty)}';\n" +
+                             $"$RegraTipo = '{EscapePsString(app?.RegraDeteccaoTipo ?? "registro")}';\n" +
+                             $"$RegraChave = '{EscapePsString(app?.RegraDeteccaoChave ?? string.Empty)}';\n" +
+                             $"$RegraValor = '{EscapePsString(app?.RegraDeteccaoValor ?? string.Empty)}';\n";
+
+                return header + scriptBase;
             }
 
             case TiposAcao.Remover:
             {
-                return await _scriptProvider.ObterScriptAsync("RemoverApp.ps1", cancellationToken);
+                var scriptBase = await _scriptProvider.ObterScriptAsync("RemoverApp.ps1", cancellationToken);
+
+                int? appCatalogoId = acao.Tarefa?.AppCatalogoId;
+                if (appCatalogoId == null && !string.IsNullOrWhiteSpace(acao.ParametrosJson))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(acao.ParametrosJson);
+                        if (doc.RootElement.TryGetProperty("appCatalogoId", out var idElem))
+                        {
+                            appCatalogoId = idElem.GetInt32();
+                        }
+                    }
+                    catch { /* ignore */ }
+                }
+
+                AppCatalogo? app = null;
+                if (appCatalogoId.HasValue)
+                {
+                    app = await _dbContext.AppsCatalogo.AsNoTracking().FirstOrDefaultAsync(a => a.Id == appCatalogoId.Value, cancellationToken);
+                }
+
+                var header = $"$UninstallCmd = '{EscapePsString(app?.ComandoRemocao ?? string.Empty)}';\n" +
+                             $"$RegraTipo = '{EscapePsString(app?.RegraDeteccaoTipo ?? "registro")}';\n" +
+                             $"$RegraChave = '{EscapePsString(app?.RegraDeteccaoChave ?? string.Empty)}';\n" +
+                             $"$RegraValor = '{EscapePsString(app?.RegraDeteccaoValor ?? string.Empty)}';\n";
+
+                return header + scriptBase;
             }
 
             default:
@@ -1165,4 +1296,7 @@ public class FilaAcoesService : IFilaAcoesService
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexStringLower(bytes);
     }
+
+    private static string EscapePsString(string? value) =>
+        value?.Replace("'", "''") ?? string.Empty;
 }

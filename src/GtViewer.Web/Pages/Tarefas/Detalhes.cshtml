@@ -1,0 +1,146 @@
+@page "{id:int}"
+@model GtViewer.Web.Pages.Tarefas.DetalhesModel
+@{
+    ViewData["Title"] = $"Tarefa #{Model.Tarefa?.Id} - Detalhes";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Tarefa #@Model.Tarefa?.Id: @Model.Tarefa?.Tipo</h2>
+            <small class="text-muted">Progresso detalhado por máquina gerenciada.</small>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" asp-page="/Tarefas/Index">Voltar para Tarefas</a>
+    </div>
+
+    @if (Model.Tarefa != null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">Aplicativo</small>
+                        <h5 class="mt-1 mb-0">@(Model.Tarefa.AppCatalogo?.Nome ?? "-")</h5>
+                        <small class="text-muted">Versão: @(Model.Tarefa.AppCatalogo?.Versao ?? "-")</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">Solicitante</small>
+                        <h5 class="mt-1 mb-0">@Model.Tarefa.Ator</h5>
+                        <small class="text-muted">Criado: @Model.Tarefa.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">Alvo</small>
+                        <h5 class="mt-1 mb-0">@(Model.Tarefa.Grupo != null ? Model.Tarefa.Grupo.Nome : $"{Model.Tarefa.Acoes.Count} Máquina(s)")</h5>
+                        <small class="text-muted">Total de ações: @Model.Tarefa.Acoes.Count</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">Status da Tarefa</small>
+                        <h5 class="mt-1 mb-0">
+                            @if (Model.Tarefa.ConcluidoEm.HasValue)
+                            {
+                                <span class="badge bg-success">Concluída</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-info text-dark">Em Andamento</span>
+                            }
+                        </h5>
+                        <small class="text-muted">
+                            @(Model.Tarefa.ConcluidoEm.HasValue ? $"Finalizado em: {Model.Tarefa.ConcluidoEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}" : "Aguardando conclusão das ações")
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light py-2">
+                <h6 class="mb-0">Ações por Máquina</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Máquina</th>
+                                <th>Número de Série</th>
+                                <th>Status Conexão</th>
+                                <th>Estado da Ação</th>
+                                <th>Resultado (GTV-RESULT)</th>
+                                <th>Código de Saída</th>
+                                <th>Tentativas</th>
+                                <th>Atualizado Em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var acao in Model.Tarefa.Acoes)
+                            {
+                                <tr>
+                                    <td class="fw-bold">
+                                        <a asp-page="/Maquinas/Detalhes" asp-route-id="@acao.MaquinaId" class="text-decoration-none">
+                                            @(acao.Maquina?.Hostname ?? "Sem hostname")
+                                        </a>
+                                    </td>
+                                    <td><code>@(acao.Maquina?.NumeroSerie ?? "-")</code></td>
+                                    <td>
+                                        <span class="badge @(acao.Maquina?.ConexaoEstado == "online" ? "bg-success" : "bg-secondary")">
+                                            @(acao.Maquina?.ConexaoEstado ?? "offline")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @switch (acao.Estado)
+                                        {
+                                            case "executada":
+                                                <span class="badge bg-success">Executada</span>
+                                                break;
+                                            case "enviada":
+                                                <span class="badge bg-primary">Enviada</span>
+                                                break;
+                                            case "pendente":
+                                                <span class="badge bg-warning text-dark">Pendente</span>
+                                                break;
+                                            case "falhou":
+                                                <span class="badge bg-danger">Falhou</span>
+                                                break;
+                                            case "resultado_desconhecido":
+                                                <span class="badge bg-dark">Resultado Desconhecido</span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-secondary">@acao.Estado</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(acao.Resultado))
+                                        {
+                                            <code class="fw-bold">@acao.Resultado</code>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>@(acao.CodigoSaida?.ToString() ?? "-")</td>
+                                    <td>@acao.Tentativas / 3</td>
+                                    <td><small>@((acao.ConcluidoEm ?? acao.EnviadoEm ?? acao.CriadoEm).ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</small></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>

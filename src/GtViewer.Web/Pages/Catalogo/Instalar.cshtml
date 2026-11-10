@@ -1,0 +1,122 @@
+@page
+@model GtViewer.Web.Pages.Catalogo.InstalarModel
+@{
+    ViewData["Title"] = "Instalar / Remover Aplicativo (J8)";
+}
+
+<div class="container py-3" style="max-width: 900px;">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h2 class="mb-0">Instalar ou Remover Aplicativo</h2>
+            <small class="text-muted">Selecione o aplicativo do catálogo e os notebooks ou grupos destinatários.</small>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" asp-page="/Catalogo/Index">Voltar</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label asp-for="SelectedAppId" class="form-label fw-bold">Aplicativo do Catálogo</label>
+                        <select asp-for="SelectedAppId" class="form-select">
+                            <option value="">-- Selecione o Aplicativo --</option>
+                            @foreach (var app in Model.Apps)
+                            {
+                                <option value="@app.Id">@app.Nome (v@(app.Versao)) - @app.FabricanteEsperado</option>
+                            }
+                        </select>
+                        <span asp-validation-for="SelectedAppId" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="Operacao" class="form-label fw-bold">Operação</label>
+                        <select asp-for="Operacao" class="form-select">
+                            <option value="instalar">Instalar</option>
+                            <option value="remover">Remover / Desinstalar</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h5 class="border-bottom pb-2">Destinatários da Ação</h5>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" asp-for="ModoAlvo" value="maquinas" id="modoMaquinas" checked onchange="toggleModo('maquinas')">
+                            <label class="form-check-label fw-bold" for="modoMaquinas">Selecionar Máquinas Específicas</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" asp-for="ModoAlvo" value="grupo" id="modoGrupo" onchange="toggleModo('grupo')">
+                            <label class="form-check-label fw-bold" for="modoGrupo">Selecionar por Grupo</label>
+                        </div>
+                    </div>
+
+                    <div id="secaoGrupo" class="col-12" style="display: none;">
+                        <label asp-for="SelectedGrupoId" class="form-label fw-bold">Grupo de Máquinas</label>
+                        <select asp-for="SelectedGrupoId" class="form-select">
+                            <option value="">-- Selecione o Grupo --</option>
+                            @foreach (var g in Model.Grupos)
+                            {
+                                <option value="@g.Id">@g.Nome (@(g.Descricao ?? "Sem descrição"))</option>
+                            }
+                        </select>
+                        <small class="text-muted">A ação será enfileirada para todas as máquinas pertencentes ao grupo.</small>
+                    </div>
+
+                    <div id="secaoMaquinas" class="col-12">
+                        <label class="form-label fw-bold">Selecione as Máquinas:</label>
+                        <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                            @if (Model.Maquinas.Count == 0)
+                            {
+                                <div class="text-muted small">Nenhuma máquina cadastrada no inventário.</div>
+                            }
+                            @foreach (var m in Model.Maquinas)
+                            {
+                                <div class="form-check py-1">
+                                    <input class="form-check-input" type="checkbox" name="SelectedMaquinaIds" value="@m.Id" id="maq_@m.Id"
+                                           @(Model.SelectedMaquinaIds.Contains(m.Id) ? "checked" : "")>
+                                    <label class="form-check-label d-flex justify-content-between" for="maq_@m.Id">
+                                        <span><strong>@(m.Hostname ?? m.NumeroSerie)</strong> <small class="text-muted ms-2">(Série: @m.NumeroSerie)</small></span>
+                                        <span>
+                                            <span class="badge @(m.ConexaoEstado == "online" ? "bg-success" : "bg-secondary")">@m.ConexaoEstado</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12 text-end mt-4">
+                        <a class="btn btn-outline-secondary me-2" asp-page="/Catalogo/Index">Cancelar</a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-send-fill"></i> Confirmar e Enfileirar Tarefa
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleModo(modo) {
+            if (modo === 'grupo') {
+                document.getElementById('secaoGrupo').style.display = 'block';
+                document.getElementById('secaoMaquinas').style.display = 'none';
+            } else {
+                document.getElementById('secaoGrupo').style.display = 'none';
+                document.getElementById('secaoMaquinas').style.display = 'block';
+            }
+        }
+    </script>
+}

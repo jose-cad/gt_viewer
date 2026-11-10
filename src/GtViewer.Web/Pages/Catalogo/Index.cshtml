@@ -1,0 +1,119 @@
+@page
+@model GtViewer.Web.Pages.Catalogo.IndexModel
+@{
+    ViewData["Title"] = "Catálogo de Aplicativos (J8)";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Catálogo de Aplicativos Aprovados</h2>
+            <small class="text-muted">Gerencie instaladores homologados e distribua para notebooks e grupos.</small>
+        </div>
+        <div class="d-flex gap-2">
+            @if (User.HasPermissao(Permissoes.InstalarApps))
+            {
+                <a class="btn btn-outline-primary" asp-page="/Catalogo/Instalar">
+                    <i class="bi bi-play-fill"></i> Instalar em Máquinas
+                </a>
+            }
+            @if (User.HasPermissao(Permissoes.GerenciarCatalogo))
+            {
+                <a class="btn btn-primary" asp-page="/Catalogo/Novo">
+                    <i class="bi bi-plus-lg"></i> Novo Aplicativo
+                </a>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @Model.MensagemSucesso
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Versão</th>
+                            <th>Fabricante Esperado</th>
+                            <th>Tamanho</th>
+                            <th>Regra de Detecção</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Apps.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    Nenhum aplicativo cadastrado no catálogo.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var app in Model.Apps)
+                        {
+                            <tr>
+                                <td class="fw-bold">@app.Nome</td>
+                                <td><span class="badge bg-secondary">@app.Versao</span></td>
+                                <td><small class="text-truncate d-inline-block" style="max-width: 250px;">@app.FabricanteEsperado</small></td>
+                                <td>@((app.TamanhoBytes / (1024.0 * 1024.0)).ToString("F2")) MB</td>
+                                <td>
+                                    <small class="badge bg-light text-dark border">@app.RegraDeteccaoTipo</small>
+                                    <small class="text-muted d-block text-truncate" style="max-width: 200px;">@app.RegraDeteccaoChave</small>
+                                </td>
+                                <td>
+                                    @if (app.Ativo)
+                                    {
+                                        <span class="badge bg-success">Ativo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inativo</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        @if (User.HasPermissao(Permissoes.InstalarApps) && app.Ativo)
+                                        {
+                                            <a class="btn btn-outline-primary" asp-page="/Catalogo/Instalar" asp-route-appId="@app.Id" title="Instalar">
+                                                Instalar
+                                            </a>
+                                        }
+                                        @if (User.HasPermissao(Permissoes.GerenciarCatalogo))
+                                        {
+                                            <a class="btn btn-outline-secondary" asp-page="/Catalogo/Editar" asp-route-id="@app.Id" title="Editar">
+                                                Editar
+                                            </a>
+                                            @if (app.Ativo)
+                                            {
+                                                <form method="post" asp-page-handler="Desativar" asp-route-id="@app.Id" class="d-inline" onsubmit="return confirm('Deseja desativar este aplicativo do catálogo?');">
+                                                    <button type="submit" class="btn btn-outline-danger">Desativar</button>
+                                                </form>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

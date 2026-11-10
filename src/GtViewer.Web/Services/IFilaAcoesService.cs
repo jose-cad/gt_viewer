@@ -76,4 +76,15 @@ public interface IFilaAcoesService
         int? appCatalogoId = null,
         string? parametrosJson = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cria uma Tarefa para uma ou mais máquinas selecionadas com uma Acao por máquina na mesma transação.
+    /// </summary>
+    Task<Tarefa> CriarTarefaMaquinasAsync(
+        IEnumerable<int> maquinasIds,
+        string tipo,
+        string ator,
+        int? appCatalogoId = null,
+        string? parametrosJson = null,
+        CancellationToken cancellationToken = default);
 }
