@@ -60,6 +60,12 @@
                                 <a class="nav-link text-dark" asp-area="" asp-page="/Tecnicos/Index">Técnicos (J9)</a>
                             </li>
                         }
+                        @if (User.HasPermissao(Permissoes.VerAuditoria))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Auditoria/Index">Auditoria (J10)</a>
+                            </li>
+                        }
                     </ul>
                     <ul class="navbar-nav">
                         @if (User.Identity?.IsAuthenticated == true)

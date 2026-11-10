@@ -1,0 +1,326 @@
+@page
+@model GtViewer.Web.Pages.Auditoria.IndexModel
+@{
+    ViewData["Title"] = "Auditoria de Ações e Segurança (J10)";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="h4 mb-1">
+                <i class="bi bi-shield-check text-primary me-2"></i>Auditoria de Ações e Segurança
+            </h2>
+            <p class="text-muted small mb-0">
+                Log imutável de todas as ações administrativas, operacionais e de sistema (retenção de 2 anos).
+            </p>
+        </div>
+        <div>
+            <a asp-page="./Index"
+               asp-page-handler="Exportar"
+               asp-route-ator="@Model.Ator"
+               asp-route-maquina="@Model.Maquina"
+               asp-route-tipo="@Model.Tipo"
+               asp-route-dataInicio="@Model.DataInicio?.ToString("yyyy-MM-dd")"
+               asp-route-dataFim="@Model.DataFim?.ToString("yyyy-MM-dd")"
+               asp-route-sucesso="@Model.Sucesso"
+               asp-route-estadoAcao="@Model.EstadoAcao"
+               class="btn btn-outline-success">
+                <i class="bi bi-file-earmark-excel me-1"></i> Exportar (.xlsx)
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Técnico / Ator</label>
+                    <input type="text" name="Ator" value="@Model.Ator" class="form-control form-control-sm" placeholder="Ex.: maria, sistema" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Máquina / Hostname / Série</label>
+                    <input type="text" name="Maquina" value="@Model.Maquina" class="form-control form-control-sm" placeholder="Hostname ou Nº de Série" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Tipo de Ação</label>
+                    <select name="Tipo" class="form-select form-select-sm">
+                        <option value="">-- Todos os tipos --</option>
+                        @foreach (var t in Model.TiposDisponiveis)
+                        {
+                            <option value="@t" selected="@(Model.Tipo == t)">@t</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Estado da Ação</label>
+                    <select name="EstadoAcao" class="form-select form-select-sm">
+                        <option value="">-- Todos os estados --</option>
+                        @foreach (var est in Model.EstadosAcaoDisponiveis)
+                        {
+                            <option value="@est" selected="@(Model.EstadoAcao == est)">@est</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Data Início</label>
+                    <input type="date" name="DataInicio" value="@Model.DataInicio?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Data Fim</label>
+                    <input type="date" name="DataFim" value="@Model.DataFim?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Resultado / Sucesso</label>
+                    <select name="Sucesso" class="form-select form-select-sm">
+                        <option value="">-- Todos --</option>
+                        <option value="true" selected="@(Model.Sucesso == true)">Sucesso</option>
+                        <option value="false" selected="@(Model.Sucesso == false)">Falha / Recusa</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                        <i class="bi bi-funnel me-1"></i> Filtrar
+                    </button>
+                    <a asp-page="./Index" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela de Auditoria -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+            <span class="fw-semibold">
+                Registros Encontrados: @Model.Resultado.TotalItens
+            </span>
+            <span class="small text-muted">
+                Página @Model.Resultado.PaginaAtual de @Math.Max(1, Model.Resultado.TotalPaginas)
+            </span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Data / Hora</th>
+                            <th>Ator</th>
+                            <th>Tipo de Ação</th>
+                            <th>Alvo / Máquina</th>
+                            <th>Ação Fila / Estado</th>
+                            <th>Status</th>
+                            <th>IP Origem</th>
+                            <th class="text-end">Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        @if (Model.Resultado.Itens.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    Nenhum registro de auditoria encontrado com os filtros informados.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Model.Resultado.Itens)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">
+                                        <div>@item.DataHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+                                        <div class="text-muted" style="font-size: 0.75rem;">@item.DataHora.ToString("yyyy-MM-dd HH:mm:ss") UTC</div>
+                                    </td>
+                                    <td>
+                                        @if (item.Ator == "sistema")
+                                        {
+                                            <span class="badge bg-secondary">sistema</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="fw-semibold">@item.Ator</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">@item.Tipo</span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(item.MaquinaHostname) || !string.IsNullOrWhiteSpace(item.MaquinaNumeroSerie))
+                                        {
+                                            <div><strong>@(item.MaquinaHostname ?? item.MaquinaNumeroSerie)</strong></div>
+                                            <div class="text-muted" style="font-size: 0.75rem;">SN: @item.MaquinaNumeroSerie</div>
+                                        }
+                                        else
+                                        {
+                                            <span>@(item.Alvo ?? "-")</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (item.AcaoId.HasValue)
+                                        {
+                                            <div>
+                                                <span class="badge bg-info text-dark">#@item.AcaoId: @item.AcaoTipo</span>
+                                                <span class="badge bg-dark">@item.AcaoEstado</span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(item.AcaoResultado))
+                                            {
+                                                <div class="text-muted" style="font-size: 0.75rem;">Res: @item.AcaoResultado</div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (item.Sucesso)
+                                        {
+                                            <span class="badge bg-success">Sucesso</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Falha</span>
+                                        }
+                                    </td>
+                                    <td class="text-muted">@(item.IpOrigem ?? "-")</td>
+                                    <td class="text-end">
+                                        @if (!string.IsNullOrWhiteSpace(item.DetalhesJson))
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-outline-info btn-sm py-0 px-2 btn-detalhes"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalDetalhes"
+                                                    data-id="@item.Id"
+                                                    data-tipo="@item.Tipo"
+                                                    data-json="@item.DetalhesJson">
+                                                <i class="bi bi-eye"></i> Ver
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (Model.Resultado.TotalPaginas > 1)
+        {
+            <div class="card-footer bg-light py-2">
+                <nav>
+                    <ul class="pagination pagination-sm justify-content-center mb-0">
+                        <li class="page-item @(Model.Resultado.PaginaAtual <= 1 ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-page="./Index"
+                               asp-route-pagina="@(Model.Resultado.PaginaAtual - 1)"
+                               asp-route-ator="@Model.Ator"
+                               asp-route-maquina="@Model.Maquina"
+                               asp-route-tipo="@Model.Tipo"
+                               asp-route-dataInicio="@Model.DataInicio?.ToString("yyyy-MM-dd")"
+                               asp-route-dataFim="@Model.DataFim?.ToString("yyyy-MM-dd")"
+                               asp-route-sucesso="@Model.Sucesso"
+                               asp-route-estadoAcao="@Model.EstadoAcao">
+                                &laquo; Anterior
+                            </a>
+                        </li>
+
+                        @for (var p = Math.Max(1, Model.Resultado.PaginaAtual - 3); p <= Math.Min(Model.Resultado.TotalPaginas, Model.Resultado.PaginaAtual + 3); p++)
+                        {
+                            <li class="page-item @(p == Model.Resultado.PaginaAtual ? "active" : "")">
+                                <a class="page-link"
+                                   asp-page="./Index"
+                                   asp-route-pagina="@p"
+                                   asp-route-ator="@Model.Ator"
+                                   asp-route-maquina="@Model.Maquina"
+                                   asp-route-tipo="@Model.Tipo"
+                                   asp-route-dataInicio="@Model.DataInicio?.ToString("yyyy-MM-dd")"
+                                   asp-route-dataFim="@Model.DataFim?.ToString("yyyy-MM-dd")"
+                                   asp-route-sucesso="@Model.Sucesso"
+                                   asp-route-estadoAcao="@Model.EstadoAcao">
+                                    @p
+                                </a>
+                            </li>
+                        }
+
+                        <li class="page-item @(Model.Resultado.PaginaAtual >= Model.Resultado.TotalPaginas ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-page="./Index"
+                               asp-route-pagina="@(Model.Resultado.PaginaAtual + 1)"
+                               asp-route-ator="@Model.Ator"
+                               asp-route-maquina="@Model.Maquina"
+                               asp-route-tipo="@Model.Tipo"
+                               asp-route-dataInicio="@Model.DataInicio?.ToString("yyyy-MM-dd")"
+                               asp-route-dataFim="@Model.DataFim?.ToString("yyyy-MM-dd")"
+                               asp-route-sucesso="@Model.Sucesso"
+                               asp-route-estadoAcao="@Model.EstadoAcao">
+                                Próxima &raquo;
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Modal de Detalhes da Auditoria -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1" aria-labelledby="modalDetalhesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalhesLabel">
+                    <i class="bi bi-file-earmark-code me-1"></i> Detalhes do Registro de Auditoria #<span id="modalDetalhesId"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <span class="fw-semibold">Tipo:</span> <span id="modalDetalhesTipo" class="badge bg-light text-dark border"></span>
+                </div>
+                <label class="form-label fw-semibold small">Metadados (JSON):</label>
+                <pre id="modalDetalhesContent" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modal = document.getElementById('modalDetalhes');
+            if (modal) {
+                modal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
+                    const id = button.getAttribute('data-id');
+                    const tipo = button.getAttribute('data-tipo');
+                    const rawJson = button.getAttribute('data-json');
+
+                    document.getElementById('modalDetalhesId').textContent = id;
+                    document.getElementById('modalDetalhesTipo').textContent = tipo;
+
+                    try {
+                        const parsed = JSON.parse(rawJson);
+                        document.getElementById('modalDetalhesContent').textContent = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        document.getElementById('modalDetalhesContent').textContent = rawJson || '(Vazio)';
+                    }
+                });
+            }
+        });
+    </script>
+}
