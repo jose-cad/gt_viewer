@@ -1,0 +1,280 @@
+@page
+@model GtViewer.Web.Pages.Contrato.IndexModel
+@{
+    ViewData["Title"] = "Conferência de Contrato da Locadora (J4)";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Contrato da Locadora de Notebooks</h2>
+            <small class="text-muted">Conferência entre a planilha vigente e o inventário de máquinas do gt_viewer.</small>
+        </div>
+        <div>
+            @if (User.HasPermissao(Permissoes.ImportarPlanilha))
+            {
+                <a class="btn btn-primary" asp-page="/Contrato/Importar">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Importar Nova Planilha
+                </a>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @Model.MensagemSucesso
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model.Relatorio.ContratoVigente == null)
+    {
+        <div class="alert alert-info border-0 shadow-sm">
+            <h5 class="alert-heading"><i class="bi bi-info-circle"></i> Nenhum contrato vigente cadastrado</h5>
+            <p class="mb-0">Para iniciar a conferência automática do contrato da locadora, importe a planilha Excel (.xlsx) recebida por e-mail.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">Planilha Vigente</small>
+                        <h6 class="mt-1 mb-0 text-truncate font-monospace" title="@Model.Relatorio.ContratoVigente.NomeArquivo">
+                            @Model.Relatorio.ContratoVigente.NomeArquivo
+                        </h6>
+                        <small class="text-muted">Importado por: @Model.Relatorio.ContratoVigente.Ator</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">No Contrato e no Inventário</small>
+                        <h3 class="mt-1 mb-0 text-success">@Model.Relatorio.NoContratoENoInventario.Count</h3>
+                        <small class="text-muted">Equipamentos em conformidade</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">No Contrato e Nunca Viu / Sumida</small>
+                        <h3 class="mt-1 mb-0 text-warning">@Model.Relatorio.NoContratoENuncaApareceuOuSumida.Count</h3>
+                        <small class="text-muted">Não conectou ou sumida (>30 dias)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 border-start border-danger border-4 h-100">
+                    <div class="card-body">
+                        <small class="text-muted text-uppercase fw-bold">No Inventário Fora do Contrato</small>
+                        <h3 class="mt-1 mb-0 text-danger">@Model.Relatorio.NoInventarioEForaDoContrato.Count</h3>
+                        <small class="text-muted">Máquinas sem série no contrato</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs mb-3" id="conferenciaTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="tab1-btn" data-bs-toggle="tab" data-bs-target="#tab1" type="button">
+                    No Contrato e no Inventário (@Model.Relatorio.NoContratoENoInventario.Count)
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab2-btn" data-bs-toggle="tab" data-bs-target="#tab2" type="button">
+                    Nunca Conectou / Sumida (@Model.Relatorio.NoContratoENuncaApareceuOuSumida.Count)
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab3-btn" data-bs-toggle="tab" data-bs-target="#tab3" type="button">
+                    Fora do Contrato (@Model.Relatorio.NoInventarioEForaDoContrato.Count)
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tabHist-btn" data-bs-toggle="tab" data-bs-target="#tabHist" type="button">
+                    Histórico de Importações (@Model.Historico.Count)
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="conferenciaTabContent">
+            <!-- Aba 1: No contrato e no inventário -->
+            <div class="tab-pane fade show active" id="tab1" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Número de Série</th>
+                                    <th>Hostname</th>
+                                    <th>Modelo</th>
+                                    <th>Fabricante</th>
+                                    <th>Status</th>
+                                    <th>Último Contato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Relatorio.NoContratoENoInventario.Count == 0)
+                                {
+                                    <tr><td colspan="6" class="text-center py-4 text-muted">Nenhuma máquina nesta categoria.</td></tr>
+                                }
+                                @foreach (var m in Model.Relatorio.NoContratoENoInventario)
+                                {
+                                    <tr>
+                                        <td><code class="fw-bold">@m.NumeroSerie</code></td>
+                                        <td>@(m.Hostname ?? "-")</td>
+                                        <td>@(m.Modelo ?? "-")</td>
+                                        <td>@(m.Fabricante ?? "-")</td>
+                                        <td><span class="badge @(m.ConexaoEstado == "online" ? "bg-success" : "bg-secondary")">@m.ConexaoEstado</span></td>
+                                        <td><small>@(m.UltimoContatoEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</small></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba 2: No contrato e nunca apareceu ou sumida -->
+            <div class="tab-pane fade" id="tab2" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Número de Série no Contrato</th>
+                                    <th>Hostname (se cadastrado)</th>
+                                    <th>Situação</th>
+                                    <th>Último Contato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Relatorio.NoContratoENuncaApareceuOuSumida.Count == 0)
+                                {
+                                    <tr><td colspan="4" class="text-center py-4 text-muted">Nenhuma máquina nesta categoria.</td></tr>
+                                }
+                                @foreach (var m in Model.Relatorio.NoContratoENuncaApareceuOuSumida)
+                                {
+                                    <tr>
+                                        <td><code class="fw-bold">@m.NumeroSerie</code></td>
+                                        <td>@(m.Hostname ?? "Não cadastrado")</td>
+                                        <td>
+                                            @if (m.ConexaoEstado == "sumida")
+                                            {
+                                                <span class="badge bg-danger">Sumida (>30 dias)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning text-dark">Nunca conectou</span>
+                                            }
+                                        </td>
+                                        <td><small>@(m.UltimoContatoEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Nunca")</small></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba 3: No inventário e fora do contrato -->
+            <div class="tab-pane fade" id="tab3" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Número de Série no Inventário</th>
+                                    <th>Hostname</th>
+                                    <th>Modelo</th>
+                                    <th>Fabricante</th>
+                                    <th>Status Conexão</th>
+                                    <th>Último Contato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Relatorio.NoInventarioEForaDoContrato.Count == 0)
+                                {
+                                    <tr><td colspan="6" class="text-center py-4 text-muted">Nenhuma máquina fora do contrato.</td></tr>
+                                }
+                                @foreach (var m in Model.Relatorio.NoInventarioEForaDoContrato)
+                                {
+                                    <tr>
+                                        <td><code class="fw-bold text-danger">@m.NumeroSerie</code></td>
+                                        <td>@(m.Hostname ?? "-")</td>
+                                        <td>@(m.Modelo ?? "-")</td>
+                                        <td>@(m.Fabricante ?? "-")</td>
+                                        <td><span class="badge @(m.ConexaoEstado == "online" ? "bg-success" : "bg-secondary")">@m.ConexaoEstado</span></td>
+                                        <td><small>@(m.UltimoContatoEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</small></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba Histórico -->
+            <div class="tab-pane fade" id="tabHist" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nome do Arquivo</th>
+                                    <th>Data Importação</th>
+                                    <th>Técnico</th>
+                                    <th>Séries Válidas</th>
+                                    <th>Repetidas</th>
+                                    <th>Ignoradas</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in Model.Historico)
+                                {
+                                    <tr class="@(h.Vigente ? "table-success" : "")">
+                                        <td class="fw-bold">#@h.Id</td>
+                                        <td class="font-monospace">@h.NomeArquivo</td>
+                                        <td><small>@h.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small></td>
+                                        <td><small class="badge bg-light text-dark border">@h.Ator</small></td>
+                                        <td><strong>@h.SeriesValidas</strong></td>
+                                        <td>@h.SeriesRepetidas</td>
+                                        <td>@h.LinhasIgnoradas</td>
+                                        <td>
+                                            @if (h.Vigente)
+                                            {
+                                                <span class="badge bg-success">Vigente</span>
+                                            }
+                                            else if (h.Confirmado)
+                                            {
+                                                <span class="badge bg-secondary">Histórico</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning text-dark">Prévia</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>

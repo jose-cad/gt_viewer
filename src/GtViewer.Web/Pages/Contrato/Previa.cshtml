@@ -1,0 +1,114 @@
+@page "{id:int}"
+@model GtViewer.Web.Pages.Contrato.PreviaModel
+@{
+    ViewData["Title"] = "Prévia de Importação do Contrato";
+}
+
+<div class="container py-3" style="max-width: 800px;">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h2 class="mb-0">Prévia da Planilha Importada</h2>
+            <small class="text-muted">Revise os números antes de confirmar como contrato vigente.</small>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" asp-page="/Contrato/Index">Voltar</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensagemErro))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @Model.MensagemErro
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model.ExigeConfirmacaoReforcada)
+    {
+        <div class="alert alert-warning border-warning shadow-sm">
+            <h5 class="alert-heading fw-bold"><i class="bi bi-shield-exclamation"></i> Atenção: Queda Expressiva de Séries</h5>
+            <p class="mb-1">
+                A planilha atual contém <strong>@Model.Importacao.SeriesValidas</strong> séries válidas, representando uma queda de
+                <strong>@Model.QuedaPercentual.ToString("F1")%</strong> em relação ao contrato vigente anterior (@Model.SeriesVigenteAnterior séries).
+            </p>
+            <small class="text-muted">Para confirmar esta planilha, você deve assinalar o termo de confirmação reforçada abaixo.</small>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-light py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold font-monospace">@Model.Importacao.NomeArquivo</span>
+                <span class="badge bg-secondary">Prévia #@Model.Importacao.Id</span>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-3 text-center mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded border">
+                        <small class="text-muted text-uppercase fw-bold d-block">Total de Linhas</small>
+                        <h4 class="mt-1 mb-0">@Model.Importacao.TotalLinhas</h4>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded border border-success">
+                        <small class="text-muted text-uppercase fw-bold d-block">Séries Válidas</small>
+                        <h4 class="mt-1 mb-0 text-success">@Model.Importacao.SeriesValidas</h4>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded border border-warning">
+                        <small class="text-muted text-uppercase fw-bold d-block">Séries Repetidas</small>
+                        <h4 class="mt-1 mb-0 text-warning">@Model.Importacao.SeriesRepetidas</h4>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded border">
+                        <small class="text-muted text-uppercase fw-bold d-block">Linhas Ignoradas</small>
+                        <h4 class="mt-1 mb-0 text-muted">@Model.Importacao.LinhasIgnoradas</h4>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold mb-2">Amostra das Primeiras Séries Identificadas:</h6>
+            <div class="p-3 bg-light rounded border mb-4 font-monospace small" style="max-height: 150px; overflow-y: auto;">
+                @if (Model.AmostraSeriais.Count == 0)
+                {
+                    <span class="text-muted">Nenhuma série extraída.</span>
+                }
+                else
+                {
+                    <div class="row g-2">
+                        @foreach (var s in Model.AmostraSeriais)
+                        {
+                            <div class="col-sm-6 col-md-4">
+                                <span class="badge bg-white text-dark border w-100 py-2 text-start">
+                                    <i class="bi bi-tag text-muted me-1"></i> @s
+                                </span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <form method="post" asp-page-handler="Confirmar">
+                <input type="hidden" asp-for="Id" />
+
+                @if (Model.ExigeConfirmacaoReforcada)
+                {
+                    <div class="form-check p-3 bg-warning-subtle border border-warning rounded mb-4">
+                        <input class="form-check-input ms-1 me-2" type="checkbox" asp-for="ConfirmacaoReforcada" id="chkReforcada" required />
+                        <label class="form-check-label fw-bold text-dark" for="chkReforcada">
+                            Estou ciente de que a quantidade de equipamentos caiu mais de 20% em relação ao contrato vigente e confirmo a substituição.
+                        </label>
+                    </div>
+                }
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-outline-secondary" asp-page="/Contrato/Index">Descartar Prévia</a>
+                    <button type="submit" class="btn btn-success px-4 fw-bold">
+                        <i class="bi bi-check-circle-fill me-1"></i> Confirmar como Contrato Vigente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
